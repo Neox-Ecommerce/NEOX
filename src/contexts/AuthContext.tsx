@@ -1,0 +1,70 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { AuthService, User } from '@/services/AuthService';
+
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<User>;
+  logout: () => void;
+  register: (userData: Omit<User, 'id'>) => Promise<User>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+  loading: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const currentUser = AuthService.getCurrentUser();
+    setUser(currentUser);
+    setLoading(false);
+  }, []);
+
+  const login = async (email: string, password: string): Promise<User> => {
+    const loggedUser = await AuthService.login(email, password);
+    setUser(loggedUser);
+    return loggedUser;
+  };
+
+  const logout = () => {
+    AuthService.logout();
+    setUser(null);
+  };
+
+  const register = async (userData: Omit<User, 'id'>): Promise<User> => {
+    const newUser = await AuthService.register(userData);
+    setUser(newUser);
+    return newUser;
+  };
+
+  const updateProfile = async (data: Partial<User>) => {
+    if (!user) return;
+    const updatedUser = await AuthService.updateProfile(user.id, data);
+    setUser(updatedUser);
+  };
+
+  return (
+    <AuthContext.Provider value={{
+      user,
+      isAuthenticated: !!user,
+      login,
+      logout,
+      register,
+      updateProfile,
+      loading
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
