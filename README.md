@@ -273,7 +273,7 @@ DELETE /api/products/:id
 
 - **Josias Azevedo** – Full-stack, UI/UX e protótipos (Fundador)
 - **Cauã** – Back-end e arquitetura (Co-fundador)
-- **Fabricio** – Back-end e suporte (Co-fundador)
+- **Fabricio** – Back-end e suporte
 
 ---
 
