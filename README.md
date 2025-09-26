@@ -1,6 +1,6 @@
-# 🛒 NeoxStore
+# 🛒 NEOX
 
-**NeoxStore** é uma plataforma moderna de e-commerce voltada para empreendedores digitais. Com uma interface intuitiva, responsiva e funcionalidades robustas, o sistema permite que usuários criem, gerenciem e operem suas próprias lojas virtuais de forma rápida e eficiente.
+**NEOX** é uma plataforma moderna de e-commerce voltada para empreendedores digitais. Com uma interface intuitiva, responsiva e funcionalidades robustas, o sistema permite que usuários criem, gerenciem e operem suas próprias lojas virtuais de forma rápida e eficiente.
 
 ## 🌐 Visão Geral
 
@@ -273,7 +273,7 @@ DELETE /api/products/:id
 
 - **Josias Azevedo** – Full-stack, UI/UX e protótipos (Fundador)
 - **Cauã** – Back-end e arquitetura (Co-fundador)
-- **Fabricio** – Back-end e suporte (Co-fundador)
+- **Fabricio** – Back-end e suporte
 
 ---
 
