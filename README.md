@@ -1,292 +1,270 @@
-# 🛒 NEOX
+# 📄 Documentação Geral do Front-end – NEOX
 
-**NeEOX** é uma plataforma moderna de e-commerce voltada para empreendedores digitais. Com uma interface intuitiva, responsiva e funcionalidades robustas, o sistema permite que usuários criem, gerenciem e operem suas próprias lojas virtuais de forma rápida e eficiente.
+##  Visão Geral e Tecnologias
 
-## 🌐 Visão Geral
+O front-end do **NEOX** é uma **Single-Page Application (SPA)** moderna e reativa, construída para oferecer uma experiência rápida, fluida e visualmente agradável.  
+A arquitetura foi desenhada para ser **escalável** e de **fácil manutenção**.
 
-O projeto está sendo desenvolvido em **React + Vite**, com foco em boas práticas de UI/UX, componentização, modularização e escalabilidade. Atualmente está em fase de desenvolvimento front-end, com mock de dados em LocalStorage, mas com interfaces prontas para integração via API REST.
-
----
-
-## ✅ Funcionalidades já implementadas
-
-- [x] Tela inicial (Home)
-- [x] Login e cadastro (com distinção de Empreendedor e Cliente)
-- [x] Painel do empreendedor (Dashboard)
-- [x] Cadastro e edição de produtos (com imagem, preço, estoque)
-- [x] Vitrine pública com produtos em destaque
-- [x] Validação com Zod e mensagens inline
-- [x] Pré-visualização de imagem no formulário
-- [x] Limite de 5MB para upload
-- [x] Toasts de sucesso/erro com feedback imediato
-- [x] Skeleton loaders e animação com React CountUp
-- [x] Busca reativa com debounce (Meus Produtos)
-- [x] Simulação de API com LocalStorage
-- [x] Finalizar cadastro de loja com verificação de CNPJ
-- [x] Criar painel administrativo completo
+- **Framework Principal:** React 18  
+- **Linguagem:** TypeScript  
+- **Build Tool:** Vite  
+- **Estilização:** Tailwind CSS + Shadcn UI (baseado em Radix UI)  
+- **Roteamento:** React Router DOM  
+- **Gestão de Estado do Servidor:** TanStack Query (React Query)  
+- **Gestão de Estado Global:** React Context API (AuthContext)  
+- **Validação de Formulários:** Zod + React Hook Form  
 
 ---
 
-## ⚙️ Tecnologias Utilizadas
-
-- **React 18**
-- **Vite**
-- **TypeScript**
-- **Tailwind CSS**
-- **ShadCN/UI**
-- **React Query**
-- **Zod**
-- **React CountUp**
-- **LocalStorage** (mock de persistência)
-
----
-
-## 📁 Estrutura de Pastas (Completa)
+## 📂 Estrutura de Pastas (corrigida)
 
 ```
-📦src
- ┣ 📂components
- ┃ ┣ 📂ui
- ┃ ┃ ┣ 📜accordion.tsx
- ┃ ┃ ┣ 📜alert.tsx
- ┃ ┃ ┣ 📜badge.tsx
- ┃ ┃ ┣ 📜button.tsx
- ┃ ┃ ┣ 📜card.tsx
- ┃ ┃ ┣ 📜checkbox.tsx
- ┃ ┃ ┣ 📜dialog.tsx
- ┃ ┃ ┣ 📜dropdown-menu.tsx
- ┃ ┃ ┣ 📜input.tsx
- ┃ ┃ ┣ 📜label.tsx
- ┃ ┃ ┣ 📜select.tsx
- ┃ ┃ ┣ 📜skeleton.tsx
- ┃ ┃ ┣ 📜switch.tsx
- ┃ ┃ ┣ 📜table.tsx
- ┃ ┃ ┣ 📜tabs.tsx
- ┃ ┃ ┣ 📜textarea.tsx
- ┃ ┃ ┣ 📜toast.tsx
- ┃ ┃ ┣ 📜toaster.tsx
- ┃ ┃ ┗ 📜tooltip.tsx
- ┃ ┣ 📜AppShell.tsx
- ┃ ┣ 📜AuthGuard.tsx
- ┃ ┣ 📜DocumentUploadModal.tsx
- ┃ ┣ 📜LoadingOverlay.tsx
- ┃ ┣ 📜MetricCard.tsx
- ┃ ┣ 📜ProductAdminCard.tsx
- ┃ ┣ 📜ProductForm.tsx
- ┃ ┣ 📜RevenueChart.tsx
- ┃ ┣ 📜RoleGuard.tsx
- ┃ ┗ 📜StatsWidget.tsx
- ┣ 📂contexts
- ┃ ┗ 📜AuthContext.tsx
- ┣ 📂hooks
- ┃ ┣ 📜use-toast.ts
- ┃ ┗ 📜useDebounce.ts
- ┣ 📂lib
- ┃ ┗ 📜utils.ts
- ┣ 📂pages
- ┃ ┣ 📂admin
- ┃ ┃ ┣ 📜login.tsx
- ┃ ┃ ┣ 📜stores.tsx
- ┃ ┃ ┗ 📜videos.tsx
- ┃ ┣ 📂auth
- ┃ ┃ ┣ 📂components
- ┃ ┃ ┃ ┣ 📂registration
- ┃ ┃ ┃ ┃ ┣ 📜PersonalDataStep.tsx
- ┃ ┃ ┃ ┃ ┣ 📜RegistrationSuccess.tsx
- ┃ ┃ ┃ ┃ ┣ 📜StoreDataStep.tsx
- ┃ ┃ ┃ ┃ ┗ 📜VerificationStep.tsx
- ┃ ┃ ┃ ┣ 📜auth-page.tsx
- ┃ ┃ ┃ ┣ 📜EntrepreneurRegistration.tsx
- ┃ ┃ ┃ ┣ 📜FloatingIcons.tsx
- ┃ ┃ ┃ ┣ 📜LoginForm.tsx
- ┃ ┃ ┃ ┣ 📜RegisterForm.tsx
- ┃ ┃ ┃ ┗ 📜RoleSelector.tsx
- ┃ ┃ ┣ 📜auth-page.tsx
- ┃ ┃ ┣ 📜index.tsx
- ┃ ┃ ┣ 📜login.tsx
- ┃ ┃ ┗ 📜register.tsx
- ┃ ┣ 📂client
- ┃ ┃ ┣ 📜cart.tsx
- ┃ ┃ ┣ 📜dashboard.tsx
- ┃ ┃ ┣ 📜home.tsx
- ┃ ┃ ┣ 📜product.tsx
- ┃ ┃ ┗ 📜store.tsx
- ┃ ┣ 📂errors
- ┃ ┃ ┣ 📜not-found.tsx
- ┃ ┃ ┗ 📜unauthorized.tsx
- ┃ ┣ 📂painel
- ┃ ┃ ┣ 📜ajuda.tsx
- ┃ ┃ ┣ 📜clientes.tsx
- ┃ ┃ ┣ 📜configuracoes.tsx
- ┃ ┃ ┣ 📜dashboard.tsx
- ┃ ┃ ┣ 📜estoque.tsx
- ┃ ┃ ┣ 📜financeiro.tsx
- ┃ ┃ ┣ 📜integracoes.tsx
- ┃ ┃ ┣ 📜marketing.tsx
- ┃ ┃ ┣ 📜pedidos.tsx
- ┃ ┃ ┣ 📜relatorios.tsx
- ┃ ┃ ┗ 📜trends.tsx
- ┃ ┣ 📂products
- ┃ ┃ ┣ 📜form.tsx
- ┃ ┃ ┗ 📜index.tsx
- ┃ ┗ 📜profile.tsx
- ┣ 📂services
- ┃ ┣ 📜AuthService.ts
- ┃ ┣ 📜ClientsService.ts
- ┃ ┣ 📜DashboardService.ts
- ┃ ┣ 📜FeedbackService.ts
- ┃ ┣ 📜FinancialService.ts
- ┃ ┣ 📜HelpService.ts
- ┃ ┣ 📜IntegrationsService.ts
- ┃ ┣ 📜InventoryService.ts
- ┃ ┣ 📜MarketingService.ts
- ┃ ┣ 📜OrdersService.ts
- ┃ ┣ 📜ProductService.ts
- ┃ ┣ 📜ReportsService.ts
- ┃ ┣ 📜SettingsService.ts
- ┃ ┣ 📜StoreService.ts
- ┃ ┣ 📜TrendsService.ts
- ┃ ┗ 📜UserService.ts
- ┣ 📜App.tsx
- ┣ 📜index.css
- ┣ 📜main.tsx
- ┗ 📜vite-env.d.ts
+/neox-frontend
+|
+|-- 📁 src/
+|   |-- 📁 components/
+|   |   |-- 📁 ui/                     # Componentes base (shadcn: Button, Card, etc.)
+|   |   |   |-- accordion.tsx
+|   |   |   |-- alert.tsx
+|   |   |   |-- badge.tsx
+|   |   |   |-- button.tsx
+|   |   |   |-- card.tsx
+|   |   |   |-- checkbox.tsx
+|   |   |   |-- dialog.tsx
+|   |   |   |-- dropdown-menu.tsx
+|   |   |   |-- input.tsx
+|   |   |   |-- label.tsx
+|   |   |   |-- select.tsx
+|   |   |   |-- skeleton.tsx
+|   |   |   |-- switch.tsx
+|   |   |   |-- table.tsx
+|   |   |   |-- tabs.tsx
+|   |   |   |-- textarea.tsx
+|   |   |   |-- toast.tsx
+|   |   |   |-- toaster.tsx
+|   |   |   |-- tooltip.tsx
+|   |   |
+|   |   |-- AppShell.tsx              # Estrutura principal da navegação (sidebar, header)
+|   |   |-- AuthGuard.tsx             # Protege rotas que exigem apenas autenticação
+|   |   |-- DocumentUploadModal.tsx   # Modal para upload de documentos
+|   |   |-- LoadingOverlay.tsx        # Indicador de carregamento global para chamadas de API
+|   |   |-- MetricCard.tsx            # Cartão para exibir métricas nos dashboards
+|   |   |-- ProductAdminCard.tsx      # Cartão de produto para a área de gestão
+|   |   |-- ProductForm.tsx           # Formulário para criar/editar produtos
+|   |   |-- RevenueChart.tsx          # Gráfico para dashboards
+|   |   |-- RoleGuard.tsx             # Protege rotas baseadas no perfil do utilizador (Role)
+|   |   |-- StatsWidget.tsx           # Widget de estatísticas
+|   |
+|   |-- 📁 contexts/
+|   |   |-- AuthContext.tsx           # Contexto para dados de autenticação do utilizador
+|   |
+|   |-- 📁 hooks/
+|   |   |-- use-toast.ts              # Hook para exibir notificações (toasts)
+|   |   |-- useDebounce.ts            # Hook para atrasar a execução de uma função (ex: pesquisa)
+|   |
+|   |-- 📁 lib/
+|   |   |-- utils.ts                  # Funções utilitárias e helpers (ex: cn, formatCurrency)
+|   |
+|   |-- 📁 pages/
+|   |   |-- 📁 admin/                 # Páginas do painel administrativo
+|   |   |   |-- login.tsx
+|   |   |   |-- stores.tsx
+|   |   |   |-- videos.tsx
+|   |   |
+|   |   |-- 📁 auth/                  # Páginas e componentes de autenticação
+|   |   |   |-- 📁 components/         # Componentes específicos para autenticação
+|   |   |   |   |-- 📁 registration/   # Componentes para o fluxo de registo de empreendedor
+|   |   |   |   |   |-- PersonalDataStep.tsx
+|   |   |   |   |   |-- RegistrationSuccess.tsx
+|   |   |   |   |   |-- StoreDataStep.tsx
+|   |   |   |   |   |-- VerificationStep.tsx
+|   |   |   |   |
+|   |   |   |   |-- auth-page.tsx
+|   |   |   |   |-- EntrepreneurRegistration.tsx
+|   |   |   |   |-- FloatingIcons.tsx
+|   |   |   |   |-- LoginForm.tsx
+|   |   |   |   |-- RegisterForm.tsx
+|   |   |   |   |-- RoleSelector.tsx
+|   |   |   |
+|   |   |   |-- index.tsx             # Página principal de autenticação
+|   |   |   |-- login.tsx
+|   |   |   |-- register.tsx
+|   |   |
+|   |   |-- 📁 client/                # Páginas do portal do cliente
+|   |   |   |-- cart.tsx
+|   |   |   |-- dashboard.tsx
+|   |   |   |-- home.tsx
+|   |   |   |-- product.tsx
+|   |   |   |-- store.tsx
+|   |   |
+|   |   |-- 📁 errors/                # Páginas de erro (404, 403)
+|   |   |   |-- not-found.tsx
+|   |   |   |-- unauthorized.tsx
+|   |   |
+|   |   |-- 📁 painel/                # Páginas do dashboard do empreendedor
+|   |   |   |-- ajuda.tsx
+|   |   |   |-- clientes.tsx
+|   |   |   |-- configuracoes.tsx
+|   |   |   |-- dashboard.tsx
+|   |   |   |-- estoque.tsx
+|   |   |   |-- financeiro.tsx
+|   |   |   |-- integracoes.tsx
+|   |   |   |-- marketing.tsx
+|   |   |   |-- pedidos.tsx
+|   |   |   |-- relatorios.tsx
+|   |   |   |-- trends.tsx
+|   |   |
+|   |   |-- 📁 products/
+|   |   |   |-- form.tsx
+|   |   |   |-- index.tsx
+|   |   |
+|   |   |-- profile.tsx               # Página de perfil do utilizador
+|   |
+|   |-- 📁 services/                  # Lógica de comunicação com a API (atualmente com dados mocados)
+|   |   |-- ApiProducts.ts
+|   |   |-- AuthService.ts
+|   |   |-- ClientsService.ts
+|   |   |-- DashboardService.ts
+|   |   |-- FeedbackService.ts
+|   |   |-- FinancialService.ts
+|   |   |-- HelpService.ts
+|   |   |-- IntegrationsService.ts
+|   |   |-- InventoryService.ts
+|   |   |-- MarketingService.ts
+|   |   |-- OrdersService.ts
+|   |   |-- ProductService.ts
+|   |   |-- ReportsService.ts
+|   |   |-- SettingsService.ts
+|   |   |-- StoreService.ts
+|   |   |-- TrendsService.ts
+|   |   |-- UserService.ts
+|   |
+|   |-- App.tsx                       # Componente raiz que define as rotas da aplicação
+|   |-- index.css                     # Estilos globais e configuração do Tailwind CSS
+|   |-- main.tsx                      # Ponto de entrada da aplicação React
+|   |-- vite-env.d.ts
+|
+|-- package.json                      # Dependências e scripts do projeto
+|-- ... (outros ficheiros de configuração: vite.config.ts, tailwind.config.js, etc.)
 ```
 
 ---
 
-## 🔗 Ponto de Integração: `/src/services/`
+# 📄 Status do Desenvolvimento do Front-end – NEOX
 
-A pasta `/services/` concentra todos os módulos de comunicação com o back-end. Cada arquivo representa uma **interface para consumo de APIs** específicas, com métodos como `getAll`, `getById`, `create`, `update`, `delete`.
+## ✅ O Que Já Foi Feito (Estado Atual)
 
-| Serviço Front-end              | Expectativa no Back-end (API REST)            |
-|--------------------------------|-----------------------------------------------|
-| `AuthService.ts`               | Login, registro, verificação de perfil        |
-| `ProductService.ts`            | CRUD de produtos                              |
-| `OrdersService.ts`             | Listar, atualizar status, criar pedidos       |
-| `FinancialService.ts`          | Consultar repasses, taxas, saldo              |
-| `ReportsService.ts`            | Gerar relatórios (vendas, pedidos, estoque)   |
-| `DashboardService.ts`          | KPIs (visitas, vendas, pedidos pendentes etc.)|
-| `ClientsService.ts`            | Listagem de clientes e perfis                 |
-| `MarketingService.ts`          | Produtos em destaque (trends), vídeos         |
-| `StoreService.ts`              | Cadastro de loja, CNPJ, redes sociais         |
+O desenvolvimento do front-end está visualmente e arquitetonicamente avançado.  
+A maior parte das interfaces está construída como componentes React, com uma estrutura de código organizada e pronta para ser conectada a um back-end real.
 
----
+### 1. Interfaces de Utilizador Abrangentes
 
-## 📁 Estrutura de Telas (`/pages/`)
+As "telas" para quase toda a aplicação já foram codificadas, resultando numa interface rica e completa.
 
-As páginas representam rotas divididas por tipo de usuário. O back-end fornecerá dados via JSON para alimentar essas telas.
+- **Portal do Cliente**
+  - Home Page: Apresenta a plataforma NEOX.
+  - Dashboard do Cliente: Hub central para o utilizador logado, exibindo produtos, resumo de pedidos e carrinho.
+  - Página de Produto: Layout para exibição de detalhes de um item específico.
+  - Página de Loja: Template para o perfil público de uma loja.
+  - Página de Carrinho: Interface para revisão e gestão dos itens antes da compra.
 
-- **`/auth`** – Registro e autenticação (JWT esperado).  
-- **`/client`** – Vitrine, loja, produtos e carrinho.  
-- **`/painel`** – Área do empreendedor com dashboard, produtos, financeiro, relatórios.  
-- **`/admin`** – Telas administrativas.  
-- **`/products`** – Cadastro/edição de produto.
+- **Painel do Empreendedor**
+  - Uma estrutura de navegação (**AppShell**) serve de base para um conjunto completo de páginas de gestão, como Dashboard, Produtos, Pedidos, Marketing, e mais.
+
+- **Painel do Admin**
+  - Interfaces para a supervisão e moderação de **Lojas** e **Vídeos (Trends)**.
 
 ---
 
-## 🔐 Autenticação e Autorização
+### 2. Sistema de Autenticação e Rotas
 
-- Contexto de autenticação via `AuthContext.tsx`.  
-- Guardiões de rota: `AuthGuard` / `RoleGuard`.  
-- O back-end deve retornar um **JWT** contendo o perfil (`admin`, `empreendedor`, `cliente`).
+- **Fluxos de Utilizador:** Os formulários e ecrãs para Login e Registo estão completos, incluindo o processo detalhado de registo para Empreendedores.  
+- **Proteção de Rotas:** O sistema de rotas (`App.tsx`) utiliza **RoleGuard** e **AuthGuard** para proteger o acesso às páginas, garantindo que apenas utilizadores autenticados e com o perfil correto possam aceder a áreas restritas.
 
 ---
 
-## 🎯 Sugestão de Organização REST no Back-end
+### 3. Lógica de Dados Simulada (Mocada)
 
+- **Serviços Independentes:** Todos os dados da aplicação (produtos, pedidos, etc.) são atualmente geridos por ficheiros na pasta `/services`. Estes ficheiros simulam uma API, utilizando o **localStorage** do navegador para guardar e ler informações.  
+- **Vantagem Estratégica:** Esta abordagem permitiu o desenvolvimento completo do UI sem depender do back-end. Mais importante, já define os "contratos" (os formatos de dados) que a API do back-end precisará de fornecer.
+
+---
+
+### 4. Arquitetura de Componentes Sólida
+
+- O projeto utiliza uma excelente **componentização**, com componentes de UI genéricos e reutilizáveis (em `/components/ui`) e componentes mais complexos e de negócio (como **ProductForm** e **MetricCard**).  
+- Isso resulta num código **limpo** e de **fácil manutenção**.
+
+---
+
+## ❌ O Que Falta Fazer (Próximos Passos Críticos)
+
+Apesar de as interfaces estarem visualmente prontas, a aplicação ainda não é funcionalmente completa.  
+O trabalho agora foca-se em substituir a simulação por interações reais com o servidor.
+
+### 1. Integração Completa com a API (Tarefa Principal)
+
+- Refatorar todos os serviços em `/src/services`.  
+- Substituir lógica baseada em `localStorage` por chamadas **axios** ou **fetch** para os endpoints correspondentes no back-end Python.  
+
+**Exemplo:**  
+A função `ProductService.getMyProducts()` deve deixar de usar:  
+```ts
+localStorage.getItem('neox_products')
+```  
+E passar a fazer:  
+```http
+GET /api/v1/products/
 ```
-/api/
-├── auth/
-├── products/
-├── orders/
-├── finance/
-├── reports/
-├── dashboard/
-├── marketing/
-├── clients/
-└── store/
-```
-
-Cada rota segue o padrão RESTful:
-
-```
-GET    /api/products
-GET    /api/products/:id
-POST   /api/products
-PUT    /api/products/:id
-DELETE /api/products/:id
-```
 
 ---
 
-## 📌 Observações
+### 2. Ativar a Navegação entre Páginas
 
-- Os dados ainda são mockados no front (LocalStorage).  
-- As interfaces de requisição/resposta já estão preparadas para consumir APIs reais.  
-- Toasts e loaders estão integrados aos retornos HTTP.  
-- Espera-se um token JWT no header `Authorization` para rotas privadas.
-
----
-
-## 🧪 Como Rodar Localmente
-
-### Pré-requisitos
-- Node.js (v18+ recomendado)
-- Git
-
-### Passos:
-
-1. **Clone o repositório**
-   ```bash
-   git clone https://github.com/seu-usuario/neoxstore.git
-   cd neoxstore
-   ```
-
-2. **Instale as dependências**
-   ```bash
-   npm install
-   ```
-
-3. **Execute o projeto**
-   ```bash
-   npm run dev
-   ```
-
-4. **Acesse no navegador**
-   ```
-   http://localhost:5173/
-   ```
+- **Conectar os Links:** Atualmente, não é possível navegar visualmente para todas as páginas.  
+- Implementar os links com `<Link>` do **react-router-dom** em locais como:
+  - Nos cartões de produto → página de detalhes do produto.  
+  - No nome da loja → página da loja (`/lojas/:id`).  
 
 ---
 
-## 🚧 Status do Projeto
+### 3. Gestão de Autenticação com Token JWT
 
-🟡 **Em desenvolvimento**  
-✔️ Front-end parcialmente concluído  
-❌ Back-end ainda não implementado (mock via LocalStorage)  
-🔜 Integração com Spring Boot e banco de dados MySQL
-
----
-
-## 🧑‍💻 Equipe
-
-- **Josias Azevedo** – Full-stack, UI/UX e protótipos (Fundador)
-- **Cauã** – Back-end e arquitetura (Co-fundador)
-- **Fabricio** – Back-end e suporte
+- `AuthService.login` deve armazenar o **token JWT** retornado pelo back-end no `localStorage`.  
+- Criar um **interceptor do axios** que adicione automaticamente o cabeçalho:  
+  ```
+  Authorization: Bearer <token>
+  ```  
+- Isso garantirá que o utilizador permaneça autenticado em todas as chamadas.  
 
 ---
 
-## 📌 Roadmap (Próximos passos)
+### 4. Implementar Funcionalidades de Upload de Ficheiros
 
-- [ ] Implementar autenticação JWT com Spring Boot
-- [ ] Desenvolver API REST e conectar com o front
-- [ ] Gerar relatórios (PDF, CSV)
-- [ ] Integrações com meios de pagamento
+- Formulários de **imagens de produtos**, **logo da loja** e **vídeos (Trends)** precisam enviar os dados como **FormData**, permitindo que o back-end processe corretamente os ficheiros.  
 
 ---
 
-## 📄 Licença
+### 5. Construir as Páginas de Gestão da Conta do Cliente
 
-Este é um projeto **privado**. Todos os direitos reservados aos desenvolvedores autorizados.  
-**Proibido uso, distribuição ou modificação sem autorização prévia.**
+- **Meu Perfil:** Edição de dados pessoais e alteração de senha.  
+- **Meus Pedidos:** Histórico detalhado de todas as compras.  
+- **Meus Favoritos:** Galeria de produtos guardados.  
+- **Meus Endereços:** Gestão de endereços de entrega.  
+
+---
+
+### 6. Desenvolver o Fluxo de Checkout Completo
+
+- Implementar o processo de finalização de compra:  
+  1. Seleção de endereço  
+  2. Cálculo de frete (dados via API)  
+  3. Seleção do método de pagamento  
+  4. Integração final com gateway de pagamento  
+
+---
+
+## 📌 Resumo
+
+O front-end está num estado **excelente em termos de UI/UX e arquitetura**.  
+O foco total da equipe agora deve ser na **integração com a API** para substituir os dados mocados e na implementação da **navegação e do fluxo de compra**, tornando a aplicação totalmente interativa e funcional.
