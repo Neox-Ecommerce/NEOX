@@ -68,9 +68,9 @@ export interface MarketingStats {
 }
 
 export class MarketingService {
-  private static CAMPAIGNS_KEY = 'neoxstore_campaigns';
-  private static COUPONS_KEY = 'neoxstore_coupons';
-  private static AFFILIATES_KEY = 'neoxstore_affiliates';
+  private static CAMPAIGNS_KEY = 'neox_campaigns';
+  private static COUPONS_KEY = 'neox_coupons';
+  private static AFFILIATES_KEY = 'neox_affiliates';
 
   private static getStoredCampaigns(): Campaign[] {
     const stored = localStorage.getItem(this.CAMPAIGNS_KEY);

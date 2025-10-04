@@ -33,7 +33,7 @@ export interface CreateProductData {
 }
 
 export class ProductService {
-  private static STORAGE_KEY = 'neoxstore_products';
+  private static STORAGE_KEY = 'neox_products';
 
   private static getProducts(): Product[] {
     const stored = localStorage.getItem(this.STORAGE_KEY);

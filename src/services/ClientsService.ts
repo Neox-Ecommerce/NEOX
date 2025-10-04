@@ -36,7 +36,7 @@ export interface ClientStats {
 }
 
 export class ClientsService {
-  private static CLIENTS_KEY = 'neoxstore_clients';
+  private static CLIENTS_KEY = 'neox_clients';
 
   private static getStoredClients(): Client[] {
     const stored = localStorage.getItem(this.CLIENTS_KEY);

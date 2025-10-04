@@ -15,7 +15,7 @@ export function ClientHomePage() {
               <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
                 <Store className="w-5 h-5 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-800">NeoxStore</span>
+              <span className="text-xl font-bold text-gray-800">NEOX</span>
             </div>
             <nav className="hidden md:flex items-center space-x-8">
               <a href="#recursos" className="text-gray-600 hover:text-green-600 transition-colors">Recursos</a>
@@ -91,7 +91,7 @@ export function ClientHomePage() {
               em minutos
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              A NeoxStore é uma plataforma completa para criação e gerenciamento de lojas online. 
+              A NEOX é uma plataforma completa para criação e gerenciamento de lojas online. 
               Monte, personalize e gerencie sua loja diretamente pelo nosso sistema web e desktop, 
               de forma intuitiva e acessível.
             </p>
@@ -112,7 +112,7 @@ export function ClientHomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-              Por que escolher a <span className="text-green-600">NeoxStore</span>?
+              Por que escolher a <span className="text-green-600">NEOX</span>?
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
               Uma plataforma completa que oferece tudo o que você precisa para ter sucesso no e-commerce
@@ -188,7 +188,7 @@ export function ClientHomePage() {
                 Quem <span className="text-green-600">Somos</span>
               </h2>
               <p className="text-lg text-gray-600 mb-6">
-                A NeoxStore nasceu da visão de democratizar o e-commerce no Brasil. Somos uma equipe apaixonada por tecnologia e empreendedorismo, dedicada a criar soluções que tornem o comércio eletrônico acessível para todos.
+                A NEOX nasceu da visão de democratizar o e-commerce no Brasil. Somos uma equipe apaixonada por tecnologia e empreendedorismo, dedicada a criar soluções que tornem o comércio eletrônico acessível para todos.
               </p>
               <p className="text-lg text-gray-600 mb-6">
                 Nossa missão é empoderar pequenos e médios empreendedores com ferramentas profissionais, permitindo que foquem no que fazem de melhor: vender seus produtos e construir relacionamentos com seus clientes.
@@ -455,8 +455,8 @@ export function ClientHomePage() {
                     </div>
                     <div>
                       <h4 className="font-semibold text-gray-800 mb-1">E-mail</h4>
-                      <p className="text-gray-600">contato@neoxstore.com.br</p>
-                      <p className="text-gray-600">suporte@neoxstore.com.br</p>
+                      <p className="text-gray-600">contato@neox.com.br</p>
+                      <p className="text-gray-600">suporte@neox.com.br</p>
                     </div>
                   </div>
                   <div className="flex items-start space-x-4">
@@ -538,7 +538,7 @@ export function ClientHomePage() {
             Pronto para começar seu negócio online?
           </h2>
           <p className="text-xl text-green-100 mb-8 max-w-2xl mx-auto">
-            Junte-se a milhares de empreendedores que já escolheram a NeoxStore para criar suas lojas virtuais
+            Junte-se a milhares de empreendedores que já escolheram a NEOX para criar suas lojas virtuais
           </p>
           <Link to="/auth">
             <Button className="bg-white text-green-600 hover:bg-gray-100 px-8 py-4 rounded-lg text-lg font-semibold transition-colors inline-flex items-center space-x-2">
@@ -558,7 +558,7 @@ export function ClientHomePage() {
                 <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
                   <Store className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-xl font-bold">NeoxStore</span>
+                <span className="text-xl font-bold">NEOX</span>
               </div>
               <p className="text-gray-300 mb-6">
                 A plataforma completa para criar e gerenciar sua loja virtual.
@@ -599,7 +599,7 @@ export function ClientHomePage() {
             </div>
           </div>
           <div className="border-t border-gray-700 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center text-gray-300">
-            <p>&copy; 2025 NeoxStore. Todos os direitos reservados.</p>
+            <p>&copy; 2025 NEOX. Todos os direitos reservados.</p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <a href="#" className="hover:text-white transition-colors text-sm">Política de Privacidade</a>
               <a href="#" className="hover:text-white transition-colors text-sm">Termos de Uso</a>

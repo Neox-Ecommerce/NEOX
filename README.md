@@ -239,8 +239,8 @@ DELETE /api/products/:id
 
 1. **Clone o repositório**
    ```bash
-   git clone https://github.com/seu-usuario/neoxstore.git
-   cd neoxstore
+   git clone https://github.com/seu-usuario/neox.git
+   cd neox
    ```
 
 2. **Instale as dependências**

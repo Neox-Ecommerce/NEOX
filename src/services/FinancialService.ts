@@ -54,9 +54,9 @@ export interface BankAccount {
 }
 
 export class FinancialService {
-  private static PAYMENTS_KEY = 'neoxstore_payments';
-  private static PAYOUTS_KEY = 'neoxstore_payouts';
-  private static BANK_ACCOUNTS_KEY = 'neoxstore_bank_accounts';
+  private static PAYMENTS_KEY = 'neox_financial_payments';
+  private static PAYOUTS_KEY = 'neox_financial_payouts';
+  private static BANK_ACCOUNTS_KEY = 'neox_financial_bank_accounts';
 
   private static getStoredPayments(): Payment[] {
     const stored = localStorage.getItem(this.PAYMENTS_KEY);

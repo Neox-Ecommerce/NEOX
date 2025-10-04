@@ -104,7 +104,7 @@ export function AdminStoresPage() {
       nomeFantasia: 'TechStore Premium',
       razaoSocial: 'TechStore Premium Comércio de Eletrônicos LTDA',
       cnpj: '12.345.678/0001-90',
-      email: 'lojista@neoxstore.com',
+      email: 'lojista@neox.com',
       status: 'APROVADA',
       createdAt: new Date('2024-01-15'),
       owner: 'João Silva',
@@ -375,7 +375,7 @@ export function AdminStoresPage() {
                   <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
                     <Shield className="w-5 h-5 text-white" />
                   </div>
-                  <span className="text-xl font-bold text-gray-900">NeoxStore Admin</span>
+                  <span className="text-xl font-bold text-gray-900">NEOX Admin</span>
                 </Link>
               </div>
 

@@ -125,9 +125,9 @@ export interface SystemSettings {
 }
 
 export class SettingsService {
-  private static STORE_SETTINGS_KEY = 'neoxstore_store_settings';
-  private static USER_PREFERENCES_KEY = 'neoxstore_user_preferences';
-  private static SYSTEM_SETTINGS_KEY = 'neoxstore_system_settings';
+  private static STORE_SETTINGS_KEY = 'neox_store_settings';
+  private static USER_PREFERENCES_KEY = 'neox_user_preferences';
+  private static SYSTEM_SETTINGS_KEY = 'neox_system_settings';
 
   private static getStoredStoreSettings(): StoreSettings {
     const stored = localStorage.getItem(this.STORE_SETTINGS_KEY);

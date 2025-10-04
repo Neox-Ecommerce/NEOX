@@ -71,9 +71,9 @@ export interface ContactInfo {
 }
 
 export class HelpService {
-  private static FAQ_KEY = 'neoxstore_faq';
-  private static TICKETS_KEY = 'neoxstore_support_tickets';
-  private static TUTORIALS_KEY = 'neoxstore_tutorials';
+  private static FAQ_KEY = 'neox_faq';
+  private static TICKETS_KEY = 'neox_support_tickets';
+  private static TUTORIALS_KEY = 'neox_tutorials';
 
   private static getStoredFAQ(): FAQItem[] {
     const stored = localStorage.getItem(this.FAQ_KEY);
@@ -170,7 +170,7 @@ export class HelpService {
         priority: 'medium',
         status: 'resolved',
         userId: '1',
-        assignedTo: 'Suporte NeoxStore',
+        assignedTo: 'Suporte NEOX',
         messages: [
           {
             id: '1',
@@ -415,7 +415,7 @@ export class HelpService {
 
   static getContactInfo(): ContactInfo {
     return {
-      email: 'suporte@neoxstore.com',
+      email: 'suporte@neox.com',
       phone: '(11) 3000-0000',
       whatsapp: '5511999999999',
       businessHours: {
@@ -428,10 +428,10 @@ export class HelpService {
         sunday: { start: '09:00', end: '12:00', active: false }
       },
       socialMedia: {
-        facebook: 'NeoxStore',
-        instagram: '@neoxstore',
-        twitter: '@neoxstore',
-        youtube: 'NeoxStore'
+        facebook: 'NEOX',
+        instagram: '@neox',
+        twitter: '@neox',
+        youtube: 'NEOX'
       }
     };
   }

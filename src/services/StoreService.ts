@@ -27,6 +27,8 @@ interface Store {
 }
 
 export class StoreService {
+  private static STORE_KEY = 'neox_store';
+
   private static store: Store = {
     id: '1',
     nomeFantasia: 'TechStore Premium',
@@ -58,13 +60,21 @@ export class StoreService {
   };
 
   static async getStore(): Promise<Store> {
+    const stored = localStorage.getItem(this.STORE_KEY);
+    if (stored) {
+      this.store = JSON.parse(stored);
+    }
     await new Promise(resolve => setTimeout(resolve, 500));
     return { ...this.store };
   }
 
   static async updateStore(data: Partial<Store>): Promise<Store> {
     await new Promise(resolve => setTimeout(resolve, 800));
-    this.store = { ...this.store, ...data };
+    const currentStore = await this.getStore();
+    this.store = { ...currentStore, ...data };
+
+    localStorage.setItem(this.STORE_KEY, JSON.stringify(this.store));
+
     return { ...this.store };
   }
 
@@ -72,6 +82,7 @@ export class StoreService {
     await new Promise(resolve => setTimeout(resolve, 2000));
     // Simular upload e verificação
     this.store.cnpjVerificado = true;
+    localStorage.setItem(this.STORE_KEY, JSON.stringify(this.store));
   }
 
   static getSegmentos(): string[] {

@@ -47,7 +47,7 @@ export interface ProductForTrend {
 }
 
 export class TrendsService {
-  private static TRENDS_KEY = 'neoxstore_trends';
+  private static TRENDS_KEY = 'neox_trends';
 
   private static getTrends(): Trend[] {
     const stored = localStorage.getItem(this.TRENDS_KEY);

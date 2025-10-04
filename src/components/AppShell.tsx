@@ -89,7 +89,7 @@ export function AppShell({ children }: AppShellProps) {
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-2">
           <Store className="h-8 w-8 text-primary" />
-          <span className="text-xl font-bold text-gray-900 dark:text-white">NeoxStore</span>
+          <span className="text-xl font-bold text-gray-900 dark:text-white">NEOX</span>
         </div>
         <Button 
           variant="ghost" 

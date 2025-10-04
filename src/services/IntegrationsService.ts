@@ -72,10 +72,10 @@ export interface Webhook {
 }
 
 export class IntegrationsService {
-  private static GATEWAYS_KEY = 'neoxstore_payment_gateways';
-  private static CARRIERS_KEY = 'neoxstore_shipping_carriers';
-  private static INTEGRATIONS_KEY = 'neoxstore_integrations';
-  private static WEBHOOKS_KEY = 'neoxstore_webhooks';
+  private static GATEWAYS_KEY = 'neox_payment_gateways';
+  private static CARRIERS_KEY = 'neox_shipping_carriers';
+  private static INTEGRATIONS_KEY = 'neox_integrations';
+  private static WEBHOOKS_KEY = 'neox_webhooks';
 
   private static getStoredGateways(): PaymentGateway[] {
     const stored = localStorage.getItem(this.GATEWAYS_KEY);
@@ -97,8 +97,7 @@ export class IntegrationsService {
         config: {
           apiKey: 'pk_test_***',
           secretKey: 'sk_test_***',
-          environment: 'sandbox',
-          webhookUrl: 'https://api.neoxstore.com/webhooks/stripe'
+          environment: 'sandbox'
         },
         fees: {
           creditCard: 3.99,
@@ -117,8 +116,7 @@ export class IntegrationsService {
         isActive: true,
         config: {
           apiKey: 'app_***',
-          environment: 'sandbox',
-          webhookUrl: 'https://api.neoxstore.com/webhooks/pagseguro'
+          environment: 'sandbox'
         },
         fees: {
           creditCard: 4.99,

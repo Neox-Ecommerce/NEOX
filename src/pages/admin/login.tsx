@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { FeedbackService } from '@/services/FeedbackService';
+import { useState } from 'react';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -31,8 +31,8 @@ export function AdminLoginPage() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'admin@neoxstore.com',
-      password: '123456'
+      email: 'admin@neox.com',
+      password: 'admin'
     }
   });
 
@@ -74,7 +74,7 @@ export function AdminLoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl mb-4">
             <Shield className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">NeoxStore</h1>
+          <h1 className="text-3xl font-bold text-gray-900">NEOX</h1>
           <p className="text-gray-600 mt-2">Painel Administrativo</p>
         </div>
 
@@ -95,7 +95,7 @@ export function AdminLoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@neoxstore.com"
+                  placeholder="admin@neox.com"
                   {...register('email')}
                   className="h-11"
                 />
@@ -155,8 +155,8 @@ export function AdminLoginPage() {
                 Credenciais de demonstração:
               </p>
               <div className="text-sm text-gray-600 space-y-1">
-                <p><strong>Email:</strong> admin@neoxstore.com</p>
-                <p><strong>Senha:</strong> 123456</p>
+                <p><strong>Email:</strong> admin@neox.com</p>
+                <p><strong>Senha:</strong> admin</p>
               </div>
             </div>
 
@@ -174,7 +174,7 @@ export function AdminLoginPage() {
 
         {/* Footer */}
         <div className="text-center mt-8 text-sm text-gray-500">
-          <p>© 2024 NeoxStore. Todos os direitos reservados.</p>
+          <p>© 2024 NEOX. Todos os direitos reservados.</p>
         </div>
       </div>
     </div>

@@ -89,7 +89,7 @@ export class ReportsService {
       topProducts: [
         { id: '1', name: 'iPhone 15 Pro Max', quantity: 15, revenue: 134999.85 },
         { id: '2', name: 'MacBook Pro 14" M3', quantity: 8, revenue: 103999.20 },
-        { id: '3', name: 'AirPods Pro', quantity: 25, revenue: 47499.75 },
+        { id: '3', name: 'AirPods Pro (3ª geração)', quantity: 25, revenue: 47499.75 },
         { id: '4', name: 'Samsung Galaxy S24', quantity: 12, revenue: 89999.88 }
       ],
       salesByDay: Array.from({ length: 30 }, (_, i) => {

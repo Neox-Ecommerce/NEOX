@@ -67,7 +67,7 @@ export interface StatusUpdateData {
 }
 
 export class OrdersService {
-  private static ORDERS_KEY = 'neoxstore_orders';
+  private static ORDERS_KEY = 'neox_orders';
 
   private static getStoredOrders(): Order[] {
     const stored = localStorage.getItem(this.ORDERS_KEY);

@@ -79,7 +79,7 @@ export function RegisterPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl mb-4">
             <Store className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">NeoxStore</h1>
+          <h1 className="text-3xl font-bold text-gray-900">NEOX</h1>
           <p className="text-gray-600 mt-2">Crie sua conta</p>
         </div>
 
@@ -277,7 +277,7 @@ export function RegisterPage() {
 
         {/* Footer */}
         <div className="text-center mt-8 text-sm text-gray-500">
-          <p>© 2024 NeoxStore. Todos os direitos reservados.</p>
+          <p>© 2024 NEOX. Todos os direitos reservados.</p>
         </div>
       </div>
     </div>

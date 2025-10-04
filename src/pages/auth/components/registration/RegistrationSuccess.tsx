@@ -100,8 +100,8 @@ export function RegistrationSuccess() {
           <div className="mt-8 pt-6 border-t border-gray-200">
             <p className="text-sm text-gray-600">
               Dúvidas? Entre em contato conosco:{' '}
-              <a href="mailto:suporte@neoxstore.com" className="text-green-600 hover:text-green-700 font-medium">
-                suporte@neoxstore.com
+              <a href="mailto:suporte@neox.com" className="text-green-600 hover:text-green-700 font-medium">
+                suporte@neox.com
               </a>
             </p>
           </div>

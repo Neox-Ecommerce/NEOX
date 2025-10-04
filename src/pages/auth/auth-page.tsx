@@ -70,7 +70,7 @@ export function AuthPage() {
           <div className="bg-white rounded-2xl shadow-xl p-8 backdrop-blur-sm border border-white/20">
             {/* Logo and Title */}
             <div className="text-center mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">NeoxStore</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Neox</h1>
               <p className="text-gray-600">Bem-vindo de volta</p>
             </div>
 

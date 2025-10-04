@@ -487,7 +487,7 @@ export function AjudaPage() {
                                 </div>
                                 <div>
                                   <div className="font-medium">
-                                    {message.isFromSupport ? 'Suporte NeoxStore' : user?.name || 'Você'}
+                                    {message.isFromSupport ? 'Suporte NEOX' : user?.name || 'Você'}
                                   </div>
                                   <div className="text-xs text-gray-500">
                                     {new Date(message.createdAt).toLocaleString('pt-BR')}

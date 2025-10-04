@@ -43,8 +43,8 @@ export interface AdjustmentData {
 }
 
 export class InventoryService {
-  private static INVENTORY_KEY = 'neoxstore_inventory';
-  private static MOVEMENTS_KEY = 'neoxstore_inventory_movements';
+  private static INVENTORY_KEY = 'neox_inventory';
+  private static MOVEMENTS_KEY = 'neox_inventory_movements';
 
   private static getStoredInventory(): InventoryItem[] {
     const stored = localStorage.getItem(this.INVENTORY_KEY);

@@ -9,8 +9,8 @@ export interface User {
 }
 
 export class AuthService {
-  private static STORAGE_KEY = 'neoxstore_user';
-  private static USERS_KEY = 'neoxstore_users';
+  private static STORAGE_KEY = 'neox_user';
+  private static USERS_KEY = 'neox_users';
 
   private static getUsers(): User[] {
     const stored = localStorage.getItem(this.USERS_KEY);
@@ -23,14 +23,14 @@ export class AuthService {
       {
         id: '1',
         name: 'Administrador',
-        email: 'admin@neoxstore.com',
+        email: 'admin@neox.com',
         role: 'ADMIN',
         phone: '(11) 99999-0001'
       },
       {
         id: '2',
         name: 'João Silva',
-        email: 'lojista@neoxstore.com',
+        email: 'lojista@neox.com',
         role: 'EMPREENDEDOR',
         phone: '(11) 99999-0002',
         lojaId: '1'
@@ -38,7 +38,7 @@ export class AuthService {
       {
         id: '3',
         name: 'Maria Santos',
-        email: 'cliente@neoxstore.com',
+        email: 'cliente@neox.com',
         role: 'CLIENTE',
         phone: '(11) 99999-0003'
       }
@@ -54,7 +54,14 @@ export class AuthService {
     const users = this.getUsers();
     const user = users.find(u => u.email === email);
     
-    if (!user || password !== '123456') {
+    // Senha de teste diferente para admin e outros usuários
+    const correctPassword = user?.role === 'ADMIN' ? 'admin' : '123456';
+
+    if (!user) {
+      throw new Error('Usuário não encontrado');
+    }
+
+    if (password !== correctPassword) {
       throw new Error('Credenciais inválidas');
     }
     
@@ -137,7 +144,10 @@ export class AuthService {
   static async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    if (currentPassword !== '123456') {
+    const user = this.getUsers().find(u => u.id === userId);
+    const correctPassword = user?.role === 'ADMIN' ? 'admin' : '123456';
+
+    if (currentPassword !== correctPassword) {
       throw new Error('Senha atual incorreta');
     }
     

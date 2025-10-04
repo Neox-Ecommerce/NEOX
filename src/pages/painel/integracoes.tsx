@@ -1018,7 +1018,7 @@ export function IntegracoesPage() {
                     id="webhook-url"
                     value={webhookData.url}
                     onChange={(e) => setWebhookData(prev => ({ ...prev, url: e.target.value }))}
-                    placeholder="https://api.seusite.com/webhooks/neoxstore"
+                    placeholder="https://api.seusite.com/webhooks/neox"
                   />
                 </div>
 
