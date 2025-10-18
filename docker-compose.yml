@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  neox-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - VITE_API_BASE_URL=http://neox-backend:8080/api
+    depends_on:
+      - neox-backend
+    networks:
+      - neox-network
+
+  neox-backend:
+    image: neox-backend:latest
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=production
+      - DATABASE_URL=jdbc:mysql://mysql:3306/neox_db
+      - DATABASE_USERNAME=neox_user
+      - DATABASE_PASSWORD=neox_password
+    depends_on:
+      - mysql
+      - redis
+    networks:
+      - neox-network
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=neox_db
+      - MYSQL_USER=neox_user
+      - MYSQL_PASSWORD=neox_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - neox-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - neox-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - neox-frontend
+      - neox-backend
+    networks:
+      - neox-network
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  neox-network:
+    driver: bridge
