@@ -49,15 +49,7 @@ export class AuthApiService {
   private static readonly BASE_PATH = '/auth';
 
   static async login(credentials: LoginRequest): Promise<ApiResponse<LoginResponse>> {
-    const formData = new FormData();
-    formData.append('username', credentials.email);
-    formData.append('password', credentials.password);
-    
-    return apiClient.post(`${this.BASE_PATH}/login`, formData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
+    return apiClient.post(`${this.BASE_PATH}/login`, credentials);
   }
 
   static async register(userData: RegisterRequest): Promise<ApiResponse<LoginResponse>> {
@@ -93,7 +85,7 @@ export class AuthApiService {
   }
 
   static async getProfile(): Promise<ApiResponse<any>> {
-    return apiClient.get(`${this.BASE_PATH}/me`);
+    return apiClient.get(`${this.BASE_PATH}/profile`);
   }
 
   static async updateProfile(data: Partial<any>): Promise<ApiResponse<any>> {

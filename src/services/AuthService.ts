@@ -1,217 +1,157 @@
-import { AuthApiService, LoginRequest, RegisterRequest } from './AuthApiService';
-
 export interface User {
-  id: number;
+  id: string;
   name: string;
   email: string;
   role: 'EMPREENDEDOR' | 'CLIENTE' | 'ADMIN';
   phone?: string;
   avatar?: string;
   lojaId?: string;
-  is_active: boolean;
-  created_at: string;
-}
-
-export interface LoginResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
 }
 
 export class AuthService {
   private static STORAGE_KEY = 'neox_user';
-  private static TOKEN_KEY = 'neox_token';
-  private static REFRESH_TOKEN_KEY = 'neox_refresh_token';
+  private static USERS_KEY = 'neox_users';
 
-  // Login usando API real
+  private static getUsers(): User[] {
+    const stored = localStorage.getItem(this.USERS_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+    
+    // Seed inicial
+    const seedUsers: User[] = [
+      {
+        id: '1',
+        name: 'Administrador',
+        email: 'admin@neox.com',
+        role: 'ADMIN',
+        phone: '(11) 99999-0001'
+      },
+      {
+        id: '2',
+        name: 'João Silva',
+        email: 'lojista@neox.com',
+        role: 'EMPREENDEDOR',
+        phone: '(11) 99999-0002',
+        lojaId: '1'
+      },
+      {
+        id: '3',
+        name: 'Maria Santos',
+        email: 'cliente@neox.com',
+        role: 'CLIENTE',
+        phone: '(11) 99999-0003'
+      }
+    ];
+    
+    localStorage.setItem(this.USERS_KEY, JSON.stringify(seedUsers));
+    return seedUsers;
+  }
+
   static async login(email: string, password: string): Promise<User> {
-    try {
-      const loginRequest: LoginRequest = { email, password };
-      const response = await AuthApiService.login(loginRequest);
-      
-      if (response.success && response.data) {
-        const { access_token, refresh_token } = response.data;
-        
-        // Armazenar tokens
-        localStorage.setItem(this.TOKEN_KEY, access_token);
-        localStorage.setItem(this.REFRESH_TOKEN_KEY, refresh_token);
-        
-        // Buscar dados do usuário
-        const userResponse = await AuthApiService.getProfile();
-        if (userResponse.success && userResponse.data) {
-          const user = userResponse.data;
-          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(user));
-          return user;
-        }
-      }
-      
-      throw new Error('Login failed');
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const users = this.getUsers();
+    const user = users.find(u => u.email === email);
+    
+    // Senha de teste diferente para admin e outros usuários
+    const correctPassword = user?.role === 'ADMIN' ? 'admin' : '123456';
+
+    if (!user) {
+      throw new Error('Usuário não encontrado');
     }
+
+    if (password !== correctPassword) {
+      throw new Error('Credenciais inválidas');
+    }
+    
+    // Ensure user has a role property
+    const userWithRole: User = {
+      ...user,
+      role: user.role || 'CLIENTE' // Default to CLIENTE if no role
+    };
+    
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(userWithRole));
+    return userWithRole;
   }
 
-  // Registro usando API real
-  static async register(userData: Omit<User, 'id' | 'created_at'> & { password: string }): Promise<User> {
-    try {
-      const registerRequest: RegisterRequest = {
-        name: userData.name,
-        email: userData.email,
-        password: userData.password,
-        role: userData.role,
-        phone: userData.phone
-      };
-      
-      const response = await AuthApiService.register(registerRequest);
-      
-      if (response.success && response.data) {
-        const { access_token, refresh_token } = response.data;
-        
-        // Armazenar tokens
-        localStorage.setItem(this.TOKEN_KEY, access_token);
-        localStorage.setItem(this.REFRESH_TOKEN_KEY, refresh_token);
-        
-        // Buscar dados do usuário
-        const userResponse = await AuthApiService.getProfile();
-        if (userResponse.success && userResponse.data) {
-          const user = userResponse.data;
-          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(user));
-          return user;
-        }
-      }
-      
-      throw new Error('Registration failed');
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
-    }
+  static logout(): void {
+    localStorage.removeItem(this.STORAGE_KEY);
   }
 
-  // Logout
-  static async logout(): Promise<void> {
-    try {
-      await AuthApiService.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Limpar dados locais independente do resultado da API
-      localStorage.removeItem(this.STORAGE_KEY);
-      localStorage.removeItem(this.TOKEN_KEY);
-      localStorage.removeItem(this.REFRESH_TOKEN_KEY);
-    }
-  }
-
-  // Obter usuário atual
   static getCurrentUser(): User | null {
     const stored = localStorage.getItem(this.STORAGE_KEY);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        return null;
-      }
-    }
-    return null;
-  }
-
-  // Verificar se está logado
-  static isLoggedIn(): boolean {
-    const user = this.getCurrentUser();
-    const token = localStorage.getItem(this.TOKEN_KEY);
-    return !!(user && token);
-  }
-
-  // Obter token atual
-  static getToken(): string | null {
-    return localStorage.getItem(this.TOKEN_KEY);
-  }
-
-  // Obter refresh token
-  static getRefreshToken(): string | null {
-    return localStorage.getItem(this.REFRESH_TOKEN_KEY);
-  }
-
-  // Atualizar perfil
-  static async updateProfile(updates: Partial<User>): Promise<User> {
-    try {
-      const response = await AuthApiService.updateProfile(updates);
-      
-      if (response.success && response.data) {
-        const updatedUser = response.data;
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedUser));
-        return updatedUser;
-      }
-      
-      throw new Error('Profile update failed');
-    } catch (error) {
-      console.error('Profile update error:', error);
-      throw error;
-    }
-  }
-
-  // Verificar se token está expirado
-  static isTokenExpired(): boolean {
-    const token = this.getToken();
-    if (!token) return true;
+    if (!stored) return null;
     
-    return AuthApiService.isTokenExpired(token);
-  }
-
-  // Refresh token
-  static async refreshToken(): Promise<string> {
-    try {
-      const refreshToken = this.getRefreshToken();
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      const response = await AuthApiService.refreshToken({ refreshToken });
-      
-      if (response.success && response.data) {
-        const { accessToken, refreshToken: newRefreshToken } = response.data;
-        
-        // Atualizar tokens
-        localStorage.setItem(this.TOKEN_KEY, accessToken);
-        localStorage.setItem(this.REFRESH_TOKEN_KEY, newRefreshToken);
-        
-        return accessToken;
-      }
-      
-      throw new Error('Token refresh failed');
-    } catch (error) {
-      console.error('Token refresh error:', error);
-      // Se falhar, fazer logout
-      await this.logout();
-      throw error;
-    }
-  }
-
-  // Verificar se usuário tem permissão
-  static hasRole(requiredRole: string | string[]): boolean {
-    const user = this.getCurrentUser();
-    if (!user) return false;
+    const user = JSON.parse(stored);
     
-    if (Array.isArray(requiredRole)) {
-      return requiredRole.includes(user.role);
+    // Ensure user has a role property
+    return {
+      ...user,
+      role: user.role || 'CLIENTE'
+    };
+  }
+
+  static async register(userData: Omit<User, 'id'>): Promise<User> {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const users = this.getUsers();
+    const existingUser = users.find(u => u.email === userData.email);
+    
+    if (existingUser) {
+      throw new Error('Email já cadastrado');
     }
     
-    return user.role === requiredRole;
+    const newUser: User = {
+      ...userData,
+      id: Date.now().toString(),
+      role: userData.role || 'CLIENTE' // Ensure role is set
+    };
+    
+    users.push(newUser);
+    localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
+    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(newUser));
+    
+    return newUser;
   }
 
-  // Verificar se é admin
-  static isAdmin(): boolean {
-    return this.hasRole('ADMIN');
+  static async updateProfile(userId: string, data: Partial<User>): Promise<User> {
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    const users = this.getUsers();
+    const index = users.findIndex(u => u.id === userId);
+    
+    if (index === -1) {
+      throw new Error('Usuário não encontrado');
+    }
+    
+    users[index] = { 
+      ...users[index], 
+      ...data,
+      role: data.role || users[index].role || 'CLIENTE' // Ensure role is preserved
+    };
+    localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
+    
+    // Atualizar usuário logado se for o mesmo
+    const currentUser = this.getCurrentUser();
+    if (currentUser && currentUser.id === userId) {
+      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(users[index]));
+    }
+    
+    return users[index];
   }
 
-  // Verificar se é empreendedor
-  static isEntrepreneur(): boolean {
-    return this.hasRole('EMPREENDEDOR');
-  }
+  static async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const user = this.getUsers().find(u => u.id === userId);
+    const correctPassword = user?.role === 'ADMIN' ? 'admin' : '123456';
 
-  // Verificar se é cliente
-  static isClient(): boolean {
-    return this.hasRole('CLIENTE');
+    if (currentPassword !== correctPassword) {
+      throw new Error('Senha atual incorreta');
+    }
+    
+    // Em uma implementação real, aqui salvaria a nova senha hasheada
+    console.log('Senha alterada com sucesso');
   }
 }
