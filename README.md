@@ -265,6 +265,18 @@ src/
 └── App.tsx            # Componente principal
 ```
 
+## 📚 Documentação Completa
+
+Toda a documentação detalhada do projeto está na pasta **[`docs/`](./docs/)**:
+
+- 📖 **[docs/README.md](./docs/README.md)** - Índice completo da documentação
+- 🏗️ **[Arquitetura](./docs/ARCHITECTURE.md)** - Arquitetura e padrões do projeto
+- 📝 **[Padrões de Código](./docs/CODING_STANDARDS.md)** - Convenções e boas práticas
+- 🚀 **[Guia de Deploy](./docs/DEPLOY_GUIDE.md)** - Instruções de deploy
+- 📊 **[Estrutura do Projeto](./docs/PROJECT_STRUCTURE.md)** - Mapa completo de arquivos
+
+Consulte a [documentação completa](./docs/README.md) para mais detalhes.
+
 ## 🤝 Contribuição
 
 ### **Como Contribuir**

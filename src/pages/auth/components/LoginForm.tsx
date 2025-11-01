@@ -28,7 +28,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
     const newErrors: Record<string, string> = {};
     
     if (!formData.email) {
-      newErrors.email = 'E-mail é obrigatório';
+      newErrors.email = 'Email é obrigatório';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'E-mail inválido';
     }
@@ -77,6 +77,10 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
     }
   };
 
+  const handleForgotPassword = () => {
+    FeedbackService.info('Recurso de recuperação de senha em desenvolvimento. Entre em contato com o suporte para redefinir seu acesso.');
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Multi-role info */}
@@ -86,20 +90,10 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
         </p>
       </div>
 
-      {/* Demo Credentials Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-        <p className="text-xs font-medium text-blue-800 mb-1">Credenciais de demonstração:</p>
-        <div className="text-xs text-blue-700 space-y-1">
-          <p><strong>Admin:</strong> admin@neox.com / 123456</p>
-          <p><strong>Empreendedor:</strong> lojista@neox.com / 123456</p>
-          <p><strong>Cliente:</strong> cliente@neox.com / 123456</p>
-        </div>
-      </div>
-
       {/* Email Field */}
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-          E-mail
+          Email
         </label>
         <div className="relative">
           <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -138,10 +132,21 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
           />
           <button
             type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+            tabIndex={-1}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowPassword(!showPassword);
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setShowPassword(!showPassword);
+            }}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-1 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 rounded"
+            aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
           >
-            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            {showPassword ? <EyeOff className="w-5 h-5 pointer-events-none" /> : <Eye className="w-5 h-5 pointer-events-none" />}
           </button>
         </div>
         {errors.password && (
@@ -163,6 +168,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
         <button
           type="button"
           className="text-sm text-green-600 hover:text-green-700 font-medium transition-colors"
+          onClick={handleForgotPassword}
         >
           Esqueci minha senha
         </button>

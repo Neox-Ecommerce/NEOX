@@ -44,7 +44,10 @@ export function LoginPage() {
       FeedbackService.success('Login realizado com sucesso!');
       navigate('/dashboard');
     } catch (error) {
-      FeedbackService.error('Credenciais inválidas');
+      const message = typeof error === 'object' && error && 'message' in error
+        ? (error as { message?: string }).message ?? 'Credenciais inválidas'
+        : 'Credenciais inválidas';
+      FeedbackService.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -102,13 +105,24 @@ export function LoginPage() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowPassword(!showPassword);
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowPassword(!showPassword);
+                    }}
+                    className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent cursor-pointer"
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
+                      <EyeOff className="h-4 w-4 text-gray-400 pointer-events-none" />
                     ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
+                      <Eye className="h-4 w-4 text-gray-400 pointer-events-none" />
                     )}
                   </Button>
                 </div>
@@ -133,16 +147,6 @@ export function LoginPage() {
               </Button>
             </form>
 
-            {/* Demo Credentials */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700 mb-2">
-                Credenciais de demonstração:
-              </p>
-              <div className="text-sm text-gray-600 space-y-1">
-                <p><strong>Email:</strong> admin@neox.com</p>
-                <p><strong>Senha:</strong> 123456</p>
-              </div>
-            </div>
           </CardContent>
         </Card>
 

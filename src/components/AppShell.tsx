@@ -35,9 +35,23 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const { user, logout } = useAuth();
+  const authContext = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Verificar se o contexto está disponível
+  if (!authContext) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <p className="text-red-600">Erro: Contexto de autenticação não disponível</p>
+        </div>
+      </div>
+    );
+  }
+
+  const { user, logout } = authContext;
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);

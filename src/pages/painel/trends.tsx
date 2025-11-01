@@ -63,7 +63,7 @@ export function TrendsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: trends = [], isLoading } = useQuery({
+  const { data: trendsData, isLoading } = useQuery({
     queryKey: ['trends', user?.lojaId],
     queryFn: () => TrendsService.getMyTrends(user?.lojaId || '1')
   });
@@ -73,10 +73,14 @@ export function TrendsPage() {
     queryFn: () => TrendsService.getTrendStats(user?.lojaId || '1')
   });
 
-  const { data: products = [] } = useQuery({
+  const { data: productsData } = useQuery({
     queryKey: ['products-for-trends', user?.lojaId],
     queryFn: () => TrendsService.getProductsForTrends(user?.lojaId || '1')
   });
+
+  // Garantir que sejam sempre arrays válidos
+  const trends = Array.isArray(trendsData) ? trendsData : [];
+  const products = Array.isArray(productsData) ? productsData : [];
 
   const uploadTrendMutation = useMutation({
     mutationFn: TrendsService.uploadTrend,
@@ -531,11 +535,13 @@ export function TrendsPage() {
                       <SelectValue placeholder="Selecione uma categoria" />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((category) => (
+                      {Array.isArray(categories) && categories.length > 0 ? categories.map((category) => (
                         <SelectItem key={category} value={category}>
                           {category}
                         </SelectItem>
-                      ))}
+                      )) : (
+                        <SelectItem value="" disabled>Nenhuma categoria disponível</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -551,14 +557,16 @@ export function TrendsPage() {
                       <SelectValue placeholder="Selecione um produto (opcional)" />
                     </SelectTrigger>
                     <SelectContent>
-                      {products.map((product) => (
+                      {Array.isArray(products) && products.length > 0 ? products.map((product) => (
                         <SelectItem key={product.id} value={product.id}>
                           <div className="flex items-center gap-2">
                             <ImageIcon className="h-4 w-4" />
                             {product.name}
                           </div>
                         </SelectItem>
-                      ))}
+                      )) : (
+                        <SelectItem value="" disabled>Nenhum produto disponível</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>

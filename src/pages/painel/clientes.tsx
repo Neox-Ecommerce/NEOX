@@ -62,10 +62,13 @@ export function ClientesPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: clients = [], isLoading } = useQuery({
+  const { data: clientsData, isLoading } = useQuery({
     queryKey: ['clients', user?.lojaId],
     queryFn: () => ClientsService.getClients(user?.lojaId || '1')
   });
+
+  // Garantir que clients seja sempre um array válido
+  const clients = Array.isArray(clientsData) ? clientsData : [];
 
   const { data: clientStats } = useQuery({
     queryKey: ['client-stats', user?.lojaId],

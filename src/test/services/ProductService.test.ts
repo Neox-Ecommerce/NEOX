@@ -1,193 +1,158 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ProductService } from '@/services/ProductService';
+import { ProductService, Product } from '@/services/ProductService';
+import { ProductApiService } from '@/services/ProductApiService';
 
-// Mock localStorage
-const mockLocalStorage = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
-};
-
-Object.defineProperty(window, 'localStorage', {
-  value: mockLocalStorage,
-});
+vi.mock('@/services/ProductApiService', () => ({
+  ProductApiService: {
+    getProductsByStore: vi.fn(),
+    getProduct: vi.fn(),
+    createProduct: vi.fn(),
+    updateProduct: vi.fn(),
+    deleteProduct: vi.fn(),
+  },
+}));
 
 describe('ProductService', () => {
+  const apiProduct = {
+    id: 1,
+    name: 'Produto Teste',
+    description: 'Descrição',
+    price: 100,
+    stock: 5,
+    category: 'Categoria',
+    image_url: null,
+    is_active: true,
+    store_id: 10,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-02T00:00:00Z',
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    mockLocalStorage.getItem.mockReturnValue(null);
   });
 
-  describe('getMyProducts', () => {
-    it('should return products for specific store', async () => {
-      const mockProducts = [
-        {
-          id: '1',
-          nome: 'Test Product',
-          descricao: 'Test Description',
-          preco: 100,
-          estoque: 10,
-          categoria: 'Test',
-          ativo: true,
-          lojaId: '1',
-          createdAt: new Date('2024-01-01'),
-          updatedAt: new Date('2024-01-01'),
-        },
-        {
-          id: '2',
-          nome: 'Another Product',
-          descricao: 'Another Description',
-          preco: 200,
-          estoque: 5,
-          categoria: 'Test',
-          ativo: true,
-          lojaId: '2',
-          createdAt: new Date('2024-01-02'),
-          updatedAt: new Date('2024-01-02'),
-        },
-      ];
-      
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockProducts));
+  describe('getProducts', () => {
+    it('should fetch and map products from API', async () => {
+      (ProductApiService.getProductsByStore as vi.Mock).mockResolvedValue({
+        data: [apiProduct],
+        success: true,
+      });
 
-      const result = await ProductService.getMyProducts('1');
+      const products = await ProductService.getProducts(10);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].lojaId).toBe('1');
+      expect(ProductApiService.getProductsByStore).toHaveBeenCalledWith(10);
+      expect(products).toHaveLength(1);
+      expect(products[0]).toMatchObject({
+        id: 1,
+        nome: 'Produto Teste',
+        preco: 100,
+        estoque: 5,
+        lojaId: 10,
+      });
     });
   });
 
-  describe('create', () => {
-    it('should create a new product', async () => {
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify([]));
+  describe('createProduct', () => {
+    it('should send mapped payload and return created product', async () => {
+      (ProductApiService.createProduct as vi.Mock).mockResolvedValue({
+        data: apiProduct,
+        success: true,
+      });
 
-      const productData = {
-        nome: 'New Product',
-        descricao: 'New Description',
-        preco: 150,
-        estoque: 20,
-        categoria: 'New Category',
+      const product = await ProductService.createProduct({
+        nome: 'Produto Teste',
+        descricao: 'Descrição',
+        preco: 100,
+        estoque: 5,
+        categoria: 'Categoria',
         ativo: true,
-      };
+        imagem: null,
+      });
 
-      const result = await ProductService.create(productData, '1');
-
-      expect(result.nome).toBe('New Product');
-      expect(result.lojaId).toBe('1');
-      expect(result.id).toBeDefined();
-      expect(mockLocalStorage.setItem).toHaveBeenCalled();
+      expect(ProductApiService.createProduct).toHaveBeenCalledWith({
+        name: 'Produto Teste',
+        description: 'Descrição',
+        price: 100,
+        stock: 5,
+        category: 'Categoria',
+        image_url: null,
+        is_active: true,
+      });
+      expect(product.nome).toBe('Produto Teste');
     });
   });
 
-  describe('update', () => {
-    it('should update an existing product', async () => {
-      const mockProducts = [
-        {
-          id: '1',
-          nome: 'Original Product',
-          descricao: 'Original Description',
-          preco: 100,
-          estoque: 10,
-          categoria: 'Test',
-          ativo: true,
-          lojaId: '1',
-          createdAt: new Date('2024-01-01'),
-          updatedAt: new Date('2024-01-01'),
-        },
-      ];
-      
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockProducts));
+  describe('updateProduct', () => {
+    it('should map updated fields', async () => {
+      (ProductApiService.updateProduct as vi.Mock).mockResolvedValue({
+        data: { ...apiProduct, name: 'Produto Atualizado', stock: 8 },
+        success: true,
+      });
 
-      const updateData = {
-        nome: 'Updated Product',
-        preco: 150,
-      };
+      const product = await ProductService.updateProduct(1, {
+        nome: 'Produto Atualizado',
+        estoque: 8,
+      });
 
-      const result = await ProductService.update('1', updateData);
-
-      expect(result.nome).toBe('Updated Product');
-      expect(result.preco).toBe(150);
-      expect(mockLocalStorage.setItem).toHaveBeenCalled();
-    });
-
-    it('should throw error for non-existent product', async () => {
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify([]));
-
-      await expect(ProductService.update('999', { nome: 'Test' })).rejects.toThrow('Produto não encontrado');
+      expect(ProductApiService.updateProduct).toHaveBeenCalledWith(1, {
+        name: 'Produto Atualizado',
+        stock: 8,
+      });
+      expect(product.nome).toBe('Produto Atualizado');
+      expect(product.estoque).toBe(8);
     });
   });
 
-  describe('delete', () => {
-    it('should delete a product', async () => {
-      const mockProducts = [
-        {
-          id: '1',
-          nome: 'Product to Delete',
-          descricao: 'Description',
-          preco: 100,
-          estoque: 10,
-          categoria: 'Test',
-          ativo: true,
-          lojaId: '1',
-          createdAt: new Date('2024-01-01'),
-          updatedAt: new Date('2024-01-01'),
-        },
-      ];
-      
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockProducts));
-
-      await ProductService.delete('1');
-
-      expect(mockLocalStorage.setItem).toHaveBeenCalled();
+  describe('deleteProduct', () => {
+    it('should call API delete', async () => {
+      (ProductApiService.deleteProduct as vi.Mock).mockResolvedValue({ data: null, success: true });
+      await ProductService.deleteProduct(1);
+      expect(ProductApiService.deleteProduct).toHaveBeenCalledWith(1);
     });
   });
 
-  describe('search', () => {
-    it('should search products by name', async () => {
-      const mockProducts = [
-        {
-          id: '1',
-          nome: 'iPhone 15',
-          descricao: 'Apple smartphone',
-          preco: 1000,
-          estoque: 5,
-          categoria: 'Eletrônicos',
-          ativo: true,
-          lojaId: '1',
-          createdAt: new Date('2024-01-01'),
-          updatedAt: new Date('2024-01-01'),
-        },
-        {
-          id: '2',
-          nome: 'Samsung Galaxy',
-          descricao: 'Android smartphone',
-          preco: 800,
-          estoque: 3,
-          categoria: 'Eletrônicos',
-          ativo: true,
-          lojaId: '1',
-          createdAt: new Date('2024-01-01'),
-          updatedAt: new Date('2024-01-01'),
-        },
-      ];
-      
-      mockLocalStorage.getItem.mockReturnValue(JSON.stringify(mockProducts));
+  describe('calculate helpers', () => {
+    const sampleProducts: Product[] = [
+      {
+        id: 1,
+        nome: 'A',
+        descricao: 'Desc',
+        preco: 100,
+        estoque: 2,
+        categoria: 'Categoria',
+        ativo: true,
+        imagem: null,
+        lojaId: 10,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 2,
+        nome: 'B',
+        descricao: 'Desc',
+        preco: 50,
+        estoque: 0,
+        categoria: 'Categoria',
+        ativo: false,
+        imagem: null,
+        lojaId: 10,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
 
-      const result = await ProductService.search('iPhone', '1');
-
-      expect(result).toHaveLength(1);
-      expect(result[0].nome).toBe('iPhone 15');
+    it('should calculate stats correctly', () => {
+      const stats = ProductService.calculateStats(sampleProducts);
+      expect(stats.total).toBe(2);
+      expect(stats.ativo).toBe(1);
+      expect(stats.inativo).toBe(1);
+      expect(stats.esgotado).toBe(1);
+      expect(stats.valorTotal).toBe(200);
     });
-  });
 
-  describe('getCategories', () => {
-    it('should return list of categories', () => {
-      const categories = ProductService.getCategories();
-      
-      expect(categories).toContain('Eletrônicos');
-      expect(categories).toContain('Informática');
-      expect(categories).toContain('Moda e Acessórios');
-      expect(Array.isArray(categories)).toBe(true);
+    it('should compute category counts', () => {
+      const counts = ProductService.calculateCategoryCounts(sampleProducts);
+      expect(counts).toEqual({ Categoria: 2 });
     });
   });
 });

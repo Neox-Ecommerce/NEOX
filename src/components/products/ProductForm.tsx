@@ -9,8 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, Package, X, ImageIcon, AlertCircle } from 'lucide-react';
-import { Product, ProductService } from '@/services/ProductService';
+import { Product } from '@/types';
+import { ProductService } from '@/services/ProductService';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/utils';
+import { useCategories } from '@/hooks/useCategories';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -38,9 +41,16 @@ interface ProductFormProps {
   loading?: boolean;
 }
 
-const categorias = ProductService.getCategories();
-
 export function ProductForm({ product, onSubmit, loading = false }: ProductFormProps) {
+  const authContext = useAuth();
+  const lojaId = authContext?.user?.lojaId;
+
+  // Usar hook customizado que SEMPRE retorna array válido
+  const { categories, isLoading: categoriesLoading } = useCategories({
+    lojaId,
+    enabled: !!lojaId,
+  });
+  
   const [imagePreview, setImagePreview] = useState<string>('');
   const [precoDisplay, setPrecoDisplay] = useState<string>('');
   const [dragActive, setDragActive] = useState(false);
@@ -174,7 +184,6 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
   };
 
   const handleFormSubmit = async (data: ProductFormData) => {
-    // Converter strings para números onde necessário
     const processedData = {
       ...data,
       preco: Number(data.preco),
@@ -299,21 +308,37 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
                   <Label htmlFor="categoria" className="text-sm font-medium">
                     Categoria *
                   </Label>
-                  <Select 
-                    value={watch('categoria')} 
-                    onValueChange={(value) => setValue('categoria', value)}
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categorias.map((categoria) => (
-                        <SelectItem key={categoria} value={categoria}>
-                          {categoria}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {categoriesLoading ? (
+                    <div className="h-11 flex items-center justify-center border rounded-md">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <span className="ml-2 text-sm text-gray-500">Carregando categorias...</span>
+                    </div>
+                  ) : (
+                    <Select 
+                      value={watch('categoria')} 
+                      onValueChange={(value) => setValue('categoria', value)}
+                      disabled={categories.length === 0}
+                    >
+                      <SelectTrigger className="h-11">
+                        <SelectValue placeholder={
+                          categories.length === 0
+                            ? "Nenhuma categoria disponível" 
+                            : "Selecione uma categoria"
+                        } />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.length > 0 ? (
+                          categories.map((categoria: string) => (
+                            <SelectItem key={categoria} value={categoria}>
+                              {categoria}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>Nenhuma categoria disponível</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
                   {errors.categoria && (
                     <p className="text-sm text-red-500 flex items-center gap-1">
                       <AlertCircle className="h-3 w-3" />
@@ -517,3 +542,4 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
     </div>
   );
 }
+

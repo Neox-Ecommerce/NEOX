@@ -1,152 +1,132 @@
-import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from '@/contexts/AuthContext';
-import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { Toaster } from '@/components/ui/toaster';
-import { NotificationBell } from '@/components/NotificationBell';
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { ErrorFallback } from '@/components/Performance';
-import { notificationService } from '@/services/NotificationService';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { AuthPage } from '@/pages/auth/auth-page';
+import { ClientHomePage } from '@/pages/client/home';
+import { Dashboard } from '@/pages/painel/dashboard';
+import { ProductsPage } from '@/pages/products/index';
+import { AppShell } from '@/components/AppShell';
+import { RoleGuard } from '@/components/RoleGuard';
 
-// Lazy load components
-const Dashboard = React.lazy(() => import('@/pages/painel/dashboard').then(m => ({ default: m.Dashboard })));
-const ProductsPage = React.lazy(() => import('@/pages/products/index').then(m => ({ default: m.ProductsPage })));
-const ProductFormPage = React.lazy(() => import('@/pages/products/form').then(m => ({ default: m.ProductFormPage })));
-const EstoquePage = React.lazy(() => import('@/pages/painel/estoque').then(m => ({ default: m.EstoquePage })));
-const PedidosPage = React.lazy(() => import('@/pages/painel/pedidos').then(m => ({ default: m.PedidosPage })));
-const TrendsPage = React.lazy(() => import('@/pages/painel/trends').then(m => ({ default: m.TrendsPage })));
-const ClientesPage = React.lazy(() => import('@/pages/painel/clientes').then(m => ({ default: m.ClientesPage })));
-const MarketingPage = React.lazy(() => import('@/pages/painel/marketing').then(m => ({ default: m.MarketingPage })));
-const RelatoriosPage = React.lazy(() => import('@/pages/painel/relatorios').then(m => ({ default: m.RelatoriosPage })));
-const FinanceiroPage = React.lazy(() => import('@/pages/painel/financeiro').then(m => ({ default: m.FinanceiroPage })));
-const IntegracoesPage = React.lazy(() => import('@/pages/painel/integracoes').then(m => ({ default: m.IntegracoesPage })));
-const ConfiguracoesPage = React.lazy(() => import('@/pages/painel/configuracoes').then(m => ({ default: m.ConfiguracoesPage })));
-const AjudaPage = React.lazy(() => import('@/pages/painel/ajuda').then(m => ({ default: m.AjudaPage })));
-const ProfilePage = React.lazy(() => import('@/pages/profile').then(m => ({ default: m.ProfilePage })));
-const NotFoundPage = React.lazy(() => import('@/pages/errors/not-found').then(m => ({ default: m.NotFoundPage })));
-const UnauthorizedPage = React.lazy(() => import('@/pages/errors/unauthorized').then(m => ({ default: m.UnauthorizedPage })));
-
-// Cliente pages
-const ClientHomePage = React.lazy(() => import('@/pages/client/home').then(m => ({ default: m.ClientHomePage })));
-const ClientDashboard = React.lazy(() => import('@/pages/client/dashboard').then(m => ({ default: m.ClientDashboard })));
-const StorePage = React.lazy(() => import('@/pages/client/store').then(m => ({ default: m.StorePage })));
-const ProductPage = React.lazy(() => import('@/pages/client/product').then(m => ({ default: m.ProductPage })));
-const CartPage = React.lazy(() => import('@/pages/client/cart').then(m => ({ default: m.CartPage })));
-
-// Auth pages
-const AuthPage = React.lazy(() => import('@/pages/auth').then(m => ({ default: m.AuthPage })));
-
-// Admin pages
-const AdminStoresPage = React.lazy(() => import('@/pages/admin/stores').then(m => ({ default: m.AdminStoresPage })));
-const AdminLoginPage = React.lazy(() => import('@/pages/admin/login').then(m => ({ default: m.AdminLoginPage })));
-const AdminVideosPage = React.lazy(() => import('@/pages/admin/videos').then(m => ({ default: m.AdminVideosPage })));
-
+// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes
+      retry: 1,
     },
   },
 });
 
-function App() {
-  useEffect(() => {
-    // Register service worker for PWA
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
-        .then((registration) => {
-          console.log('SW registered: ', registration);
-        })
-        .catch((registrationError) => {
-          console.log('SW registration failed: ', registrationError);
-        });
-    }
+function AppRoutes() {
+  const authContext = useAuth();
+  
+  // Verificar se o contexto está disponível
+  if (!authContext) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto mb-4"></div>
+          <p className="text-red-600">Erro: Contexto de autenticação não disponível</p>
+        </div>
+      </div>
+    );
+  }
 
-    // Request notification permission
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
+  const { isAuthenticated, user, isLoading } = authContext;
 
-    // Show welcome notification
-    setTimeout(() => {
-      notificationService.notifySuccess(
-        'Bem-vindo à NEOX!',
-        'Sua plataforma de e-commerce está pronta para uso.'
-      );
-    }, 2000);
-  }, []);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <Router>
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-              <LoadingOverlay />
-              <Suspense fallback={
-                <div className="flex items-center justify-center min-h-screen">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <Router>
+      <Routes>
+        {!isAuthenticated ? (
+          <>
+            <Route path="/" element={<ClientHomePage />} />
+            <Route path="/auth" element={<AuthPage onSuccess={() => window.location.reload()} />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
+        ) : (
+          <>
+            <Route path="/auth" element={<Navigate to="/painel" replace />} />
+            <Route path="/" element={<Navigate to="/painel" replace />} />
+            
+            <Route path="/painel" element={
+              <RoleGuard requiredRole="EMPREENDEDOR">
+                <AppShell>
+                  <Dashboard user={user} />
+                </AppShell>
+              </RoleGuard>
+            } />
+            
+            <Route path="/painel/produtos" element={
+              <RoleGuard requiredRole="EMPREENDEDOR">
+                <AppShell>
+                  <ProductsPage />
+                </AppShell>
+              </RoleGuard>
+            } />
+            
+            <Route path="/painel/produtos/novo" element={
+              <RoleGuard requiredRole="EMPREENDEDOR">
+                <AppShell>
+                  <div className="p-6">
+                    <h1 className="text-2xl font-bold mb-4">Novo Produto</h1>
+                    <p className="text-gray-600">Formulário de criação de produto será implementado aqui.</p>
+                  </div>
+                </AppShell>
+              </RoleGuard>
+            } />
+            
+            <Route path="/painel/produtos/editar/:id" element={
+              <RoleGuard requiredRole="EMPREENDEDOR">
+                <AppShell>
+                  <div className="p-6">
+                    <h1 className="text-2xl font-bold mb-4">Editar Produto</h1>
+                    <p className="text-gray-600">Formulário de edição de produto será implementado aqui.</p>
+                  </div>
+                </AppShell>
+              </RoleGuard>
+            } />
+            
+            {/* Cliente routes */}
+            <Route path="/loja" element={
+              <RoleGuard requiredRole="CLIENTE">
+                <div className="min-h-screen bg-gray-50">
+                  <div className="container mx-auto px-4 py-8">
+                    <h1 className="text-3xl font-bold mb-6">Loja</h1>
+                    <p className="text-gray-600">Página da loja para clientes será implementada aqui.</p>
+                  </div>
                 </div>
-              }>
-                <Routes>
-                  {/* Public Routes */}
-                  <Route path="/auth" element={<AuthPage />} />
-                  <Route path="/unauthorized" element={<UnauthorizedPage />} />
-                  
-                  {/* Client Routes */}
-                  <Route path="/" element={<ClientHomePage />} />
-                  <Route path="/cliente" element={<ClientDashboard />} />
-                  <Route path="/lojas/:id" element={<StorePage />} />
-                  <Route path="/produto/:id" element={<ProductPage />} />
-                  <Route path="/carrinho" element={<CartPage />} />
-                  
-                  {/* Painel do Empreendedor */}
-                  <Route path="/painel" element={<Navigate to="/painel/dashboard" replace />} />
-                  <Route path="/painel/dashboard" element={<Dashboard />} />
-                  <Route path="/painel/produtos" element={<ProductsPage />} />
-                  <Route path="/painel/produtos/novo" element={<ProductFormPage />} />
-                  <Route path="/painel/produtos/editar/:id" element={<ProductFormPage />} />
-                  <Route path="/painel/estoque" element={<EstoquePage />} />
-                  <Route path="/painel/pedidos" element={<PedidosPage />} />
-                  <Route path="/painel/trends" element={<TrendsPage />} />
-                  <Route path="/painel/clientes" element={<ClientesPage />} />
-                  <Route path="/painel/marketing" element={<MarketingPage />} />
-                  <Route path="/painel/relatorios" element={<RelatoriosPage />} />
-                  <Route path="/painel/financeiro" element={<FinanceiroPage />} />
-                  <Route path="/painel/financeiro/pagamentos" element={<FinanceiroPage />} />
-                  <Route path="/painel/financeiro/repasses" element={<FinanceiroPage />} />
-                  <Route path="/painel/integracoes" element={<IntegracoesPage />} />
-                  <Route path="/painel/configuracoes" element={<ConfiguracoesPage />} />
-                  <Route path="/painel/ajuda" element={<AjudaPage />} />
-                  <Route path="/painel/perfil" element={<ProfilePage />} />
-                  
-                  {/* Admin Routes */}
-                  <Route path="/admin" element={<Navigate to="/admin/lojas" replace />} />
-                  <Route path="/admin/lojas" element={<AdminStoresPage />} />
-                  <Route path="/admin/videos" element={<AdminVideosPage />} />
-                  <Route path="/admin/login" element={<AdminLoginPage />} />
-                  
-                  {/* Legacy redirects */}
-                  <Route path="/login" element={<Navigate to="/auth" replace />} />
-                  <Route path="/register" element={<Navigate to="/auth" replace />} />
-                  <Route path="/dashboard" element={<Navigate to="/painel/dashboard" replace />} />
-                  <Route path="/products" element={<Navigate to="/painel/produtos" replace />} />
-                  <Route path="/products/new" element={<Navigate to="/painel/produtos/novo" replace />} />
-                  <Route path="/products/edit/:id" element={<Navigate to="/painel/produtos/editar/:id" replace />} />
-                  <Route path="/profile" element={<Navigate to="/painel/perfil" replace />} />
-                  
-                  {/* Catch all - 404 */}
-                  <Route path="*" element={<NotFoundPage />} />
-                </Routes>
-              </Suspense>
-              <Toaster />
-            </div>
-          </Router>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
+              </RoleGuard>
+            } />
+            
+            <Route path="*" element={<Navigate to="/painel" replace />} />
+          </>
+        )}
+      </Routes>
+    </Router>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <AppRoutes />
+        <Toaster />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

@@ -66,20 +66,25 @@ export function EstoquePage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: inventory = [], isLoading } = useQuery({
+  const { data: inventoryData, isLoading } = useQuery({
     queryKey: ['inventory', user?.lojaId],
     queryFn: () => InventoryService.getInventory(user?.lojaId || '1')
   });
 
-  const { data: movements = [] } = useQuery({
+  const { data: movementsData } = useQuery({
     queryKey: ['inventory-movements', user?.lojaId],
     queryFn: () => InventoryService.getMovements(user?.lojaId || '1')
   });
 
-  const { data: alerts = [] } = useQuery({
+  const { data: alertsData } = useQuery({
     queryKey: ['inventory-alerts', user?.lojaId],
     queryFn: () => InventoryService.getAlerts(user?.lojaId || '1')
   });
+
+  // Garantir que sejam sempre arrays válidos
+  const inventory = Array.isArray(inventoryData) ? inventoryData : [];
+  const movements = Array.isArray(movementsData) ? movementsData : [];
+  const alerts = Array.isArray(alertsData) ? alertsData : [];
 
   const adjustInventoryMutation = useMutation({
     mutationFn: InventoryService.adjustInventory,

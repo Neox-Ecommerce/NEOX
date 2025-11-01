@@ -293,13 +293,22 @@ export function RelatoriosPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {salesReport?.topProducts.map((product) => (
-                            <TableRow key={product.id}>
-                              <TableCell className="font-medium">{product.name}</TableCell>
-                              <TableCell>{product.quantity}</TableCell>
-                              <TableCell>{formatCurrency(product.revenue)}</TableCell>
-                            </TableRow>
-                          ))}
+                          {salesReport?.topProducts && Array.isArray(salesReport.topProducts) 
+                            ? salesReport.topProducts.map((product) => (
+                                <TableRow key={product.id}>
+                                  <TableCell className="font-medium">{product.name}</TableCell>
+                                  <TableCell>{product.quantity}</TableCell>
+                                  <TableCell>{formatCurrency(product.revenue)}</TableCell>
+                                </TableRow>
+                              ))
+                            : (
+                                <TableRow>
+                                  <TableCell colSpan={3} className="text-center text-gray-500">
+                                    Nenhum produto encontrado
+                                  </TableCell>
+                                </TableRow>
+                              )
+                          }
                         </TableBody>
                       </Table>
                     </div>

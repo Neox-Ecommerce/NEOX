@@ -74,10 +74,13 @@ export function PedidosPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: orders = [], isLoading } = useQuery({
+  const { data: ordersData, isLoading } = useQuery({
     queryKey: ['orders', user?.lojaId],
     queryFn: () => OrdersService.getOrders(user?.lojaId || '1')
   });
+
+  // Garantir que orders seja sempre um array válido
+  const orders = Array.isArray(ordersData) ? ordersData : [];
 
   const { data: orderStats } = useQuery({
     queryKey: ['order-stats', user?.lojaId],

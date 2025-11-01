@@ -277,6 +277,10 @@ export function ProfilePage() {
 
   const segmentos = StoreService.getSegmentos();
   const categoriasTributarias = StoreService.getCategoriasTributarias();
+  
+  // Garantir que sejam sempre arrays válidos
+  const segmentosArray = Array.isArray(segmentos) ? segmentos : [];
+  const categoriasTributariasArray = Array.isArray(categoriasTributarias) ? categoriasTributarias : [];
   const tiposEntrega = StoreService.getTiposEntrega();
   const diasSemana = StoreService.getDiasSemana();
 
@@ -578,14 +582,16 @@ export function ProfilePage() {
                                       <SelectValue placeholder="Selecione a categoria" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {categoriasTributarias.map((categoria) => (
+                                      {categoriasTributariasArray.length > 0 ? categoriasTributariasArray.map((categoria) => (
                                         <SelectItem key={categoria.value} value={categoria.value}>
                                           <div>
                                             <div className="font-medium">{categoria.label}</div>
                                             <div className="text-xs text-gray-500">{categoria.description}</div>
                                           </div>
                                         </SelectItem>
-                                      ))}
+                                      )) : (
+                                        <SelectItem value="" disabled>Nenhuma categoria disponível</SelectItem>
+                                      )}
                                     </SelectContent>
                                   </Select>
                                 )}

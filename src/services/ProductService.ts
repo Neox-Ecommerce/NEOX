@@ -1,302 +1,217 @@
-export interface Product {
-  id: string;
-  nome: string;
-  descricao: string;
-  preco: number;
-  estoque: number;
-  imagem?: string;
-  categoria: string;
-  ativo: boolean;
-  peso?: number;
-  dimensoes?: string;
-  marca?: string;
-  sku?: string;
-  desconto?: number;
-  lojaId: string;
-  createdAt: Date;
-  updatedAt: Date;
+import { ProductApiService, Product as ApiProduct, ProductCreate, ProductUpdate } from './ProductApiService';
+import { Product, CreateProductData, ProductStats } from '@/types';
+import { getDefaultCategories } from '@/constants/categories';
+import { extractApiArray } from '@/utils/api-helpers';
+
+// Re-exportar tipos para compatibilidade
+export type { Product, CreateProductData, ProductStats };
+
+function mapApiProductToProduct(apiProduct: ApiProduct): Product {
+  return {
+    id: apiProduct.id,
+    nome: apiProduct.name,
+    descricao: apiProduct.description,
+    preco: apiProduct.price,
+    estoque: apiProduct.stock,
+    imagem: apiProduct.image_url ?? null,
+    categoria: apiProduct.category,
+    ativo: apiProduct.is_active,
+    peso: null,
+    dimensoes: null,
+    marca: null,
+    sku: null,
+    desconto: null,
+    lojaId: apiProduct.store_id,
+    createdAt: new Date(apiProduct.created_at),
+    updatedAt: apiProduct.updated_at ? new Date(apiProduct.updated_at) : null,
+  };
 }
 
-export interface CreateProductData {
-  nome: string;
-  descricao: string;
-  preco: number;
-  estoque: number;
-  imagem?: string;
-  categoria: string;
-  ativo: boolean;
-  peso?: number;
-  dimensoes?: string;
-  marca?: string;
-  sku?: string;
-  desconto?: number;
+function mapCreateDataToApi(data: CreateProductData): ProductCreate {
+  return {
+    name: data.nome,
+    description: data.descricao,
+    price: data.preco,
+    stock: data.estoque,
+    category: data.categoria,
+    image_url: data.imagem,
+    is_active: data.ativo ?? true,
+  };
 }
+
+function mapUpdateDataToApi(data: Partial<CreateProductData>): ProductUpdate {
+  const apiData: ProductUpdate = {};
+
+  if (data.nome !== undefined) apiData.name = data.nome;
+  if (data.descricao !== undefined) apiData.description = data.descricao;
+  if (data.preco !== undefined) apiData.price = data.preco;
+  if (data.estoque !== undefined) apiData.stock = data.estoque;
+  if (data.categoria !== undefined) apiData.category = data.categoria;
+  if (data.imagem !== undefined) apiData.image_url = data.imagem;
+  if (data.ativo !== undefined) apiData.is_active = data.ativo;
+
+  return apiData;
+}
+
+// ProductStats já está importado de @/types
 
 export class ProductService {
-  private static STORAGE_KEY = 'neox_products';
-
-  private static getProducts(): Product[] {
-    const stored = localStorage.getItem(this.STORAGE_KEY);
-    if (stored) {
-      return JSON.parse(stored).map((p: any) => ({
-        ...p,
-        createdAt: new Date(p.createdAt),
-        updatedAt: new Date(p.updatedAt)
-      }));
+  static async getProducts(lojaId?: number | string | null): Promise<Product[]> {
+    if (lojaId === undefined || lojaId === null) {
+      return [];
     }
-    
-    // Seed inicial
-    const seedProducts: Product[] = [
-      {
-        id: '1',
-        nome: 'iPhone 15 Pro Max',
-        descricao: 'O iPhone 15 Pro Max representa o ápice da tecnologia móvel da Apple. Com seu design em titânio premium, tela Super Retina XDR de 6,7 polegadas e o revolucionário chip A17 Pro, oferece desempenho incomparável.',
-        preco: 8999.99,
-        estoque: 15,
-        imagem: 'https://images.pexels.com/photos/607812/pexels-photo-607812.jpeg?auto=compress&cs=tinysrgb&w=800',
-        categoria: 'Eletrônicos',
-        ativo: true,
-        peso: 0.221,
-        dimensoes: '15.9 x 7.7 x 0.83 cm',
-        marca: 'Apple',
-        sku: 'IPH15PM-256-TIT',
-        desconto: 5,
-        lojaId: '1',
-        createdAt: new Date('2024-01-15'),
-        updatedAt: new Date('2024-01-15')
-      },
-      {
-        id: '2',
-        nome: 'MacBook Pro 14" M3',
-        descricao: 'O MacBook Pro de 14 polegadas com chip M3 redefine o que é possível em um notebook. Com arquitetura de 3 nanômetros, oferece até 22 horas de bateria e desempenho excepcional.',
-        preco: 12999.90,
-        estoque: 8,
-        imagem: 'https://images.pexels.com/photos/205421/pexels-photo-205421.jpeg?auto=compress&cs=tinysrgb&w=800',
-        categoria: 'Informática',
-        ativo: true,
-        peso: 1.55,
-        dimensoes: '31.26 x 22.12 x 1.55 cm',
-        marca: 'Apple',
-        sku: 'MBP14-M3-512-SG',
-        desconto: 8,
-        lojaId: '1',
-        createdAt: new Date('2024-01-10'),
-        updatedAt: new Date('2024-01-10')
-      },
-      {
-        id: '3',
-        nome: 'AirPods Pro (3ª geração)',
-        descricao: 'Os AirPods Pro de 3ª geração elevam a experiência de áudio sem fio a um novo patamar. Com cancelamento ativo de ruído adaptativo.',
-        preco: 1899.99,
-        estoque: 0,
-        imagem: 'https://images.pexels.com/photos/3394650/pexels-photo-3394650.jpeg?auto=compress&cs=tinysrgb&w=800',
-        categoria: 'Eletrônicos',
-        ativo: true,
-        peso: 0.0056,
-        dimensoes: '3.05 x 2.18 x 2.4 cm',
-        marca: 'Apple',
-        sku: 'APP3-WHT-USB',
-        desconto: 10,
-        lojaId: '1',
-        createdAt: new Date('2024-01-08'),
-        updatedAt: new Date('2024-01-08')
-      },
-      {
-        id: '4',
-        nome: 'Samsung Galaxy S24 Ultra',
-        descricao: 'O Galaxy S24 Ultra representa o futuro dos smartphones Android. Com tela Dynamic AMOLED 2X de 6,8 polegadas.',
-        preco: 7499.99,
-        estoque: 3,
-        imagem: 'https://images.pexels.com/photos/1092644/pexels-photo-1092644.jpeg?auto=compress&cs=tinysrgb&w=800',
-        categoria: 'Eletrônicos',
-        ativo: false,
-        peso: 0.232,
-        dimensoes: '16.26 x 7.9 x 0.86 cm',
-        marca: 'Samsung',
-        sku: 'GS24U-512-BLK',
-        desconto: 12,
-        lojaId: '1',
-        createdAt: new Date('2024-01-05'),
-        updatedAt: new Date('2024-01-05')
+
+    try {
+      const response = await ProductApiService.getProductsByStore(Number(lojaId));
+      
+      // Extrair e normalizar array de produtos
+      const productsArray = extractApiArray<ApiProduct>(response);
+      
+      // Mapear produtos com validação
+      return productsArray
+        .filter(item => item && typeof item === 'object') // Filtrar itens inválidos
+        .map(mapApiProductToProduct);
+    } catch (error) {
+      console.error('Erro ao buscar produtos:', error);
+      return [];
+    }
+  }
+
+  static async getProduct(id: string | number): Promise<Product | null> {
+    try {
+      const response = await ProductApiService.getProduct(Number(id));
+      if (!response || !response.data) {
+        console.warn('Resposta da API inválida para getProduct');
+        return null;
       }
-    ];
-    
-    this.saveProducts(seedProducts);
-    return seedProducts;
-  }
-
-  private static saveProducts(products: Product[]): void {
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(products));
-  }
-
-  static async getMyProducts(lojaId: string = '1'): Promise<Product[]> {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    return this.getProducts()
-      .filter(p => p.lojaId === lojaId)
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }
-
-  static async getById(id: string): Promise<Product | null> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return this.getProducts().find(p => p.id === id) || null;
-  }
-
-  static async create(data: CreateProductData, lojaId: string = '1'): Promise<Product> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const products = this.getProducts();
-    const newProduct: Product = {
-      ...data,
-      id: Date.now().toString(),
-      lojaId,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    products.unshift(newProduct);
-    this.saveProducts(products);
-    return newProduct;
-  }
-
-  static async update(id: string, data: Partial<CreateProductData>): Promise<Product> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const products = this.getProducts();
-    const index = products.findIndex(p => p.id === id);
-    if (index === -1) {
-      throw new Error('Produto não encontrado');
+      return mapApiProductToProduct(response.data);
+    } catch (error) {
+      console.error('Erro ao buscar produto:', error);
+      return null;
     }
-    
-    products[index] = {
-      ...products[index],
-      ...data,
-      updatedAt: new Date()
-    };
-    
-    this.saveProducts(products);
-    return products[index];
   }
 
-  static async delete(id: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const products = this.getProducts();
-    const filtered = products.filter(p => p.id !== id);
-    this.saveProducts(filtered);
-  }
-
-  static async deleteMany(ids: string[]): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const products = this.getProducts();
-    const filtered = products.filter(p => !ids.includes(p.id));
-    this.saveProducts(filtered);
-  }
-
-  static async toggleStatus(id: string): Promise<Product> {
-    // Simular delay de API
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const products = this.getProducts();
-    const index = products.findIndex(p => p.id === id);
-    
-    if (index === -1) {
-      throw new Error('Produto não encontrado');
-    }
-    
-    products[index] = {
-      ...products[index],
-      ativo: !products[index].ativo,
-      updatedAt: new Date()
-    };
-    
-    this.saveProducts(products);
-    return products[index];
-  }
-
-  static async toggleManyStatus(ids: string[], status: boolean): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const products = this.getProducts();
-    
-    ids.forEach(id => {
-      const index = products.findIndex(p => p.id === id);
-      if (index !== -1) {
-        products[index] = {
-          ...products[index],
-          ativo: status,
-          updatedAt: new Date()
-        };
+  static async createProduct(data: CreateProductData): Promise<Product> {
+    try {
+      const payload = mapCreateDataToApi(data);
+      const response = await ProductApiService.createProduct(payload);
+      if (!response || !response.data) {
+        throw new Error('Resposta da API inválida ao criar produto');
       }
-    });
-    
-    this.saveProducts(products);
+      return mapApiProductToProduct(response.data);
+    } catch (error) {
+      console.error('Erro ao criar produto:', error);
+      throw error;
+    }
   }
 
-  static async search(query: string, lojaId: string = '1'): Promise<Product[]> {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    
-    const searchTerm = query.toLowerCase();
-    return this.getProducts()
-      .filter(product => product.lojaId === lojaId)
-      .filter(product => 
-        product.nome.toLowerCase().includes(searchTerm) ||
-        product.descricao.toLowerCase().includes(searchTerm) ||
-        product.categoria.toLowerCase().includes(searchTerm) ||
-        product.marca?.toLowerCase().includes(searchTerm) ||
-        product.sku?.toLowerCase().includes(searchTerm)
-      );
+  static async updateProduct(id: string | number, data: Partial<CreateProductData>): Promise<Product> {
+    try {
+      const payload = mapUpdateDataToApi(data);
+      const response = await ProductApiService.updateProduct(Number(id), payload);
+      if (!response || !response.data) {
+        throw new Error('Resposta da API inválida ao atualizar produto');
+      }
+      return mapApiProductToProduct(response.data);
+    } catch (error) {
+      console.error('Erro ao atualizar produto:', error);
+      throw error;
+    }
   }
 
-  static async getByCategory(category: string, lojaId: string = '1'): Promise<Product[]> {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    return this.getProducts()
-      .filter(product => product.lojaId === lojaId && product.categoria === category);
+  static async deleteProduct(id: string | number): Promise<void> {
+    await ProductApiService.deleteProduct(Number(id));
   }
 
-  static getCategories(): string[] {
-    return [
-      'Eletrônicos',
-      'Informática',
-      'Moda e Acessórios',
-      'Casa e Jardim',
-      'Esportes e Lazer',
-      'Livros e Papelaria',
-      'Alimentação',
-      'Saúde e Beleza',
-      'Automotivo',
-      'Brinquedos',
-      'Móveis',
-      'Outros'
-    ];
+  static async getCategories(lojaId?: number | string | null): Promise<string[]> {
+    // Esta função SEMPRE retorna um array válido, nunca lança erro
+    try {
+      // Sempre retornar pelo menos as categorias padrão
+      if (lojaId === undefined || lojaId === null) {
+        return getDefaultCategories();
+      }
+      
+      let products: Product[] = [];
+      
+      try {
+        // Tentar buscar produtos, mas se falhar, continuar com array vazio
+        products = await this.getProducts(lojaId);
+        // getProducts sempre retorna array válido
+      } catch (productsError) {
+        // Se getProducts falhar, apenas logar e continuar com array vazio
+        console.warn('getProducts falhou, usando categorias padrão. Erro:', productsError);
+        products = [];
+      }
+      
+      // Se não houver produtos, retornar categorias padrão
+      if (!products || products.length === 0) {
+        return getDefaultCategories();
+      }
+      
+      // Extrair categorias dos produtos de forma segura
+      try {
+        const categories = Array.from(
+          new Set(
+            products
+              .map(product => {
+                // Garantir que product existe e tem categoria válida
+                if (!product || typeof product !== 'object') return null;
+                const categoria = product.categoria;
+                // Garantir que categoria seja string válida
+                if (typeof categoria === 'string' && categoria.trim()) {
+                  return categoria.trim();
+                }
+                return null;
+              })
+              .filter((cat): cat is string => cat !== null && typeof cat === 'string' && cat.length > 0)
+          )
+        );
+        
+        // Sempre retornar pelo menos as categorias padrão se não houver categorias dos produtos
+        return categories.length > 0 ? categories : getDefaultCategories();
+      } catch (extractionError) {
+        console.warn('Erro ao extrair categorias dos produtos:', extractionError);
+        return getDefaultCategories();
+      }
+    } catch (error) {
+      // Última camada de proteção - NUNCA lançar erro, sempre retornar categorias padrão
+      console.error('Erro inesperado ao buscar categorias:', error);
+      return getDefaultCategories();
+    }
   }
 
-  static getCategoryCounts(lojaId: string = '1'): Record<string, number> {
-    const products = this.getProducts().filter(p => p.lojaId === lojaId);
-    const counts: Record<string, number> = {};
-    
-    this.getCategories().forEach(category => {
-      counts[category] = products.filter(p => p.categoria === category).length;
-    });
-    
-    return counts;
-  }
+  static calculateStats(products: Product[]): ProductStats {
+    const total = products.length;
+    const ativo = products.filter(product => product.ativo).length;
+    const inativo = total - ativo;
+    const estoqueBaixo = products.filter(product => product.estoque > 0 && product.estoque <= 5).length;
+    const esgotado = products.filter(product => product.estoque === 0).length;
+    const valorTotal = products.reduce((sum, product) => sum + product.preco * product.estoque, 0);
 
-  static getProductStats(lojaId: string = '1'): {
-    total: number;
-    ativo: number;
-    inativo: number;
-    estoqueBaixo: number;
-    esgotado: number;
-  } {
-    const products = this.getProducts().filter(p => p.lojaId === lojaId);
-    
     return {
-      total: products.length,
-      ativo: products.filter(p => p.ativo).length,
-      inativo: products.filter(p => !p.ativo).length,
-      estoqueBaixo: products.filter(p => p.estoque > 0 && p.estoque <= 5).length,
-      esgotado: products.filter(p => p.estoque === 0).length
+      total,
+      ativo,
+      inativo,
+      estoqueBaixo,
+      esgotado,
+      valorTotal,
     };
+  }
+
+  static calculateCategoryCounts(products: Product[]): Record<string, number> {
+    return products.reduce<Record<string, number>>((acc, product) => {
+      const categoria = product.categoria || 'Outros';
+      acc[categoria] = (acc[categoria] || 0) + 1;
+      return acc;
+    }, {});
+  }
+
+  static search(products: Product[], query: string): Product[] {
+    const term = query.toLowerCase();
+    return products.filter(product =>
+      product.nome.toLowerCase().includes(term) ||
+      product.descricao.toLowerCase().includes(term) ||
+      product.categoria.toLowerCase().includes(term)
+    );
   }
 }

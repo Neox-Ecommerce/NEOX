@@ -1,5 +1,4 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
-import { AuthService } from '@/services/AuthService';
 
 export interface ApiResponse<T = any> {
   data: T;
@@ -24,7 +23,7 @@ class ApiClient {
 
   constructor() {
     this.client = axios.create({
-      baseURL: import.meta.env.VITE_API_BASE_URL || '',
+      baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
       timeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '10000'),
       headers: {
         'Content-Type': 'application/json',
@@ -90,8 +89,7 @@ class ApiClient {
   }
 
   private getToken(): string | null {
-    const user = AuthService.getCurrentUser();
-    return user ? localStorage.getItem('neox_token') : null;
+    return localStorage.getItem('neox_token');
   }
 
   private async refreshToken(): Promise<void> {
@@ -102,13 +100,18 @@ class ApiClient {
       }
 
       const response = await axios.post(`${this.client.defaults.baseURL}/auth/refresh`, {
-        refreshToken,
+        refresh_token: refreshToken,
       });
 
-      const { accessToken, refreshToken: newRefreshToken } = response.data;
-      
-      localStorage.setItem('neox_token', accessToken);
-      localStorage.setItem('neox_refresh_token', newRefreshToken);
+      const { access_token, refresh_token: newRefreshToken } = response.data as {
+        access_token: string;
+        refresh_token?: string;
+      };
+
+      localStorage.setItem('neox_token', access_token);
+      if (newRefreshToken) {
+        localStorage.setItem('neox_refresh_token', newRefreshToken);
+      }
     } catch (error) {
       throw new Error('Token refresh failed');
     }
@@ -127,7 +130,9 @@ class ApiClient {
   }
 
   private handleLogout() {
-    AuthService.logout();
+    localStorage.removeItem('neox_token');
+    localStorage.removeItem('neox_refresh_token');
+    localStorage.removeItem('neox_user');
     window.location.href = '/auth';
   }
 
@@ -151,27 +156,63 @@ class ApiClient {
   // HTTP Methods
   async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     const response = await this.client.get(url, config);
-    return response.data;
+    
+    // Normalizar resposta da API
+    // A API pode retornar o array diretamente, ou dentro de uma estrutura
+    let data = response.data;
+    
+    // Se a resposta tiver estrutura { data: [...], items: [...], results: [...] }
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      // Verificar se há uma propriedade 'data' que é o array
+      if ('data' in data && Array.isArray(data.data)) {
+        data = data.data;
+      }
+      // Ou 'items'
+      else if ('items' in data && Array.isArray(data.items)) {
+        data = data.items;
+      }
+      // Ou 'results'
+      else if ('results' in data && Array.isArray(data.results)) {
+        data = data.results;
+      }
+    }
+    
+    return {
+      data: data as T,
+      success: true,
+    };
   }
 
   async post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     const response = await this.client.post(url, data, config);
-    return response.data;
+    return {
+      data: response.data as T,
+      success: true,
+    };
   }
 
   async put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     const response = await this.client.put(url, data, config);
-    return response.data;
+    return {
+      data: response.data as T,
+      success: true,
+    };
   }
 
   async patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     const response = await this.client.patch(url, data, config);
-    return response.data;
+    return {
+      data: response.data as T,
+      success: true,
+    };
   }
 
   async delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
     const response = await this.client.delete(url, config);
-    return response.data;
+    return {
+      data: response.data as T,
+      success: true,
+    };
   }
 
   // File upload with progress
@@ -196,7 +237,10 @@ class ApiClient {
     };
 
     const response = await this.client.post(url, formData, config);
-    return response.data;
+    return {
+      data: response.data as T,
+      success: true,
+    };
   }
 
   // Batch requests

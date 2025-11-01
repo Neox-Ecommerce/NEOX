@@ -194,10 +194,21 @@ export function PersonalDataStep({ data, onComplete }: PersonalDataStepProps) {
             />
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              tabIndex={-1}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowPassword(!showPassword);
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowPassword(!showPassword);
+              }}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-1 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 rounded"
+              aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
             >
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showPassword ? <EyeOff className="w-5 h-5 pointer-events-none" /> : <Eye className="w-5 h-5 pointer-events-none" />}
             </button>
           </div>
           
@@ -255,10 +266,21 @@ export function PersonalDataStep({ data, onComplete }: PersonalDataStepProps) {
             />
             <button
               type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              tabIndex={-1}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowConfirmPassword(!showConfirmPassword);
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setShowConfirmPassword(!showConfirmPassword);
+              }}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer p-1 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 rounded"
+              aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
             >
-              {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showConfirmPassword ? <EyeOff className="w-5 h-5 pointer-events-none" /> : <Eye className="w-5 h-5 pointer-events-none" />}
             </button>
             {formData.confirmPassword && formData.password === formData.confirmPassword && !errors.confirmPassword && (
               <CheckCircle className="absolute right-10 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />

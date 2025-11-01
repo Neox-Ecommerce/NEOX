@@ -60,7 +60,10 @@ export function AdminLoginPage() {
       FeedbackService.success('Login realizado com sucesso!');
       navigate('/admin/lojas');
     } catch (error) {
-      FeedbackService.error('Credenciais inválidas');
+      const message = typeof error === 'object' && error && 'message' in error
+        ? (error as { message?: string }).message ?? 'Credenciais inválidas'
+        : 'Credenciais inválidas';
+      FeedbackService.error(message);
     } finally {
       setIsLoading(false);
     }

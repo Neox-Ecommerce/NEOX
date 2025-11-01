@@ -1,151 +1,189 @@
-interface Store {
+import { StoreApiService, Store as ApiStore, StoreCreate, StoreUpdate } from './StoreApiService';
+
+export interface Store {
   id: string;
-  nomeFantasia: string;
-  razaoSocial: string;
-  cnpj: string;
-  cnpjVerificado: boolean;
-  segmento: string;
-  categoriaTributaria: string;
+  nome: string;
+  descricao: string;
+  endereco: string;
+  telefone: string;
+  email: string;
+  website?: string;
   logo?: string;
-  endereco?: string;
-  telefone?: string;
-  descricaoLoja?: string;
-  horarioFuncionamento: {
-    [key: string]: {
-      ativo: boolean;
-      abertura: string;
-      fechamento: string;
-    };
+  ativo: boolean;
+  proprietarioId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateStoreData {
+  nome: string;
+  descricao: string;
+  endereco: string;
+  telefone: string;
+  email: string;
+  website?: string;
+  logo?: string;
+}
+
+// Função para converter loja da API para o formato do frontend
+function convertApiStoreToStore(apiStore: ApiStore): Store {
+  return {
+    id: apiStore.id.toString(),
+    nome: apiStore.name,
+    descricao: apiStore.description || '',
+    endereco: apiStore.address || '',
+    telefone: apiStore.phone || '',
+    email: apiStore.email || '',
+    website: apiStore.website,
+    logo: apiStore.logo_url,
+    ativo: apiStore.is_active,
+    proprietarioId: apiStore.owner_id.toString(),
+    createdAt: new Date(apiStore.created_at),
+    updatedAt: apiStore.updated_at ? new Date(apiStore.updated_at) : new Date(apiStore.created_at)
   };
-  redesSociais: {
-    instagram?: string;
-    facebook?: string;
-    whatsapp?: string;
-    website?: string;
+}
+
+// Função para converter dados do frontend para o formato da API
+function convertCreateDataToApi(createData: CreateStoreData): StoreCreate {
+  return {
+    name: createData.nome,
+    description: createData.descricao,
+    address: createData.endereco,
+    phone: createData.telefone,
+    email: createData.email,
+    website: createData.website,
+    logo_url: createData.logo,
+    is_active: true
   };
-  tiposEntrega: string[];
+}
+
+// Função para converter dados de atualização
+function convertUpdateDataToApi(updateData: Partial<CreateStoreData>): StoreUpdate {
+  const apiData: StoreUpdate = {};
+  
+  if (updateData.nome !== undefined) apiData.name = updateData.nome;
+  if (updateData.descricao !== undefined) apiData.description = updateData.descricao;
+  if (updateData.endereco !== undefined) apiData.address = updateData.endereco;
+  if (updateData.telefone !== undefined) apiData.phone = updateData.telefone;
+  if (updateData.email !== undefined) apiData.email = updateData.email;
+  if (updateData.website !== undefined) apiData.website = updateData.website;
+  if (updateData.logo !== undefined) apiData.logo_url = updateData.logo;
+  
+  return apiData;
 }
 
 export class StoreService {
-  private static STORE_KEY = 'neox_store';
-
-  private static store: Store = {
-    id: '1',
-    nomeFantasia: 'TechStore Premium',
-    razaoSocial: 'TechStore Premium Comércio de Eletrônicos LTDA',
-    cnpj: '12.345.678/0001-90',
-    cnpjVerificado: false,
-    segmento: 'Eletrônicos',
-    categoriaTributaria: 'Simples Nacional',
-    logo: 'https://images.pexels.com/photos/1029757/pexels-photo-1029757.jpeg?auto=compress&cs=tinysrgb&w=150',
-    endereco: 'Rua das Flores, 123 - São Paulo, SP',
-    telefone: '(11) 3333-4444',
-    descricaoLoja: 'Loja especializada em produtos eletrônicos de alta qualidade com os melhores preços do mercado.',
-    horarioFuncionamento: {
-      segunda: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      terca: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      quarta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      quinta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      sexta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      sabado: { ativo: true, abertura: '09:00', fechamento: '17:00' },
-      domingo: { ativo: false, abertura: '09:00', fechamento: '17:00' }
-    },
-    redesSociais: {
-      instagram: '@techstore_premium',
-      facebook: 'TechStorePremium',
-      whatsapp: '5511999999999',
-      website: 'https://techstore.com.br'
-    },
-    tiposEntrega: ['Delivery próprio', 'Retirada no local']
-  };
-
-  static async getStore(): Promise<Store> {
-    const stored = localStorage.getItem(this.STORE_KEY);
-    if (stored) {
-      this.store = JSON.parse(stored);
-    }
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { ...this.store };
-  }
-
-  static async updateStore(data: Partial<Store>): Promise<Store> {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    const currentStore = await this.getStore();
-    this.store = { ...currentStore, ...data };
-
-    localStorage.setItem(this.STORE_KEY, JSON.stringify(this.store));
-
-    return { ...this.store };
-  }
-
-  static async uploadDocument(file: File, description: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    // Simular upload e verificação
-    this.store.cnpjVerificado = true;
-    localStorage.setItem(this.STORE_KEY, JSON.stringify(this.store));
-  }
-
-  static getSegmentos(): string[] {
-    return [
-      'Eletrônicos',
-      'Moda e Acessórios',
-      'Casa e Jardim',
-      'Esportes e Lazer',
-      'Livros e Papelaria',
-      'Alimentação',
-      'Saúde e Beleza',
-      'Automotivo',
-      'Brinquedos',
-      'Informática',
-      'Móveis',
-      'Outros'
-    ];
-  }
-
-  static getCategoriasTributarias(): Array<{value: string, label: string, description: string}> {
-    return [
-      {
-        value: 'MEI',
-        label: 'MEI - Microempreendedor Individual',
-        description: 'Para faturamento até R$ 81.000/ano'
-      },
-      {
-        value: 'Simples Nacional',
-        label: 'Simples Nacional',
-        description: 'Para faturamento até R$ 4.800.000/ano'
-      },
-      {
-        value: 'Lucro Presumido',
-        label: 'Lucro Presumido',
-        description: 'Para faturamento até R$ 78.000.000/ano'
-      },
-      {
-        value: 'Lucro Real',
-        label: 'Lucro Real',
-        description: 'Para empresas de grande porte'
+  // Buscar todas as lojas
+  static async getStores(): Promise<Store[]> {
+    try {
+      const response = await StoreApiService.getStores();
+      if (response.success && response.data) {
+        return response.data.map(convertApiStoreToStore);
       }
-    ];
+      return [];
+    } catch (error) {
+      console.error('Erro ao buscar lojas:', error);
+      return [];
+    }
   }
 
-  static getTiposEntrega(): string[] {
-    return [
-      'Delivery próprio',
-      'Retirada no local',
-      'Entrega por apps parceiros',
-      'Correios',
-      'Transportadora'
-    ];
+  // Buscar loja por ID
+  static async getStore(id: string): Promise<Store | null> {
+    try {
+      const response = await StoreApiService.getStore(parseInt(id));
+      if (response.success && response.data) {
+        return convertApiStoreToStore(response.data);
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao buscar loja:', error);
+      return null;
+    }
   }
 
-  static getDiasSemana(): Array<{key: string, label: string}> {
-    return [
-      { key: 'segunda', label: 'Segunda-feira' },
-      { key: 'terca', label: 'Terça-feira' },
-      { key: 'quarta', label: 'Quarta-feira' },
-      { key: 'quinta', label: 'Quinta-feira' },
-      { key: 'sexta', label: 'Sexta-feira' },
-      { key: 'sabado', label: 'Sábado' },
-      { key: 'domingo', label: 'Domingo' }
-    ];
+  // Buscar minha loja
+  static async getMyStore(): Promise<Store | null> {
+    try {
+      const response = await StoreApiService.getMyStore();
+      if (response.success && response.data) {
+        return convertApiStoreToStore(response.data);
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao buscar minha loja:', error);
+      return null;
+    }
+  }
+
+  // Criar loja
+  static async createStore(storeData: CreateStoreData): Promise<Store | null> {
+    try {
+      const apiData = convertCreateDataToApi(storeData);
+      const response = await StoreApiService.createStore(apiData);
+      if (response.success && response.data) {
+        return convertApiStoreToStore(response.data);
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao criar loja:', error);
+      return null;
+    }
+  }
+
+  // Atualizar loja
+  static async updateStore(id: string, storeData: Partial<CreateStoreData>): Promise<Store | null> {
+    try {
+      const apiData = convertUpdateDataToApi(storeData);
+      const response = await StoreApiService.updateStore(parseInt(id), apiData);
+      if (response.success && response.data) {
+        return convertApiStoreToStore(response.data);
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao atualizar loja:', error);
+      return null;
+    }
+  }
+
+  // Deletar loja
+  static async deleteStore(id: string): Promise<boolean> {
+    try {
+      const response = await StoreApiService.deleteStore(parseInt(id));
+      return response.success;
+    } catch (error) {
+      console.error('Erro ao deletar loja:', error);
+      return false;
+    }
+  }
+
+  // Buscar lojas por nome
+  static async searchStores(query: string): Promise<Store[]> {
+    try {
+      const allStores = await this.getStores();
+      return allStores.filter(store => 
+        store.nome.toLowerCase().includes(query.toLowerCase()) ||
+        store.descricao.toLowerCase().includes(query.toLowerCase())
+      );
+    } catch (error) {
+      console.error('Erro ao buscar lojas:', error);
+      return [];
+    }
+  }
+
+  // Toggle status da loja
+  static async toggleStoreStatus(id: string): Promise<Store | null> {
+    try {
+      const store = await this.getStore(id);
+      if (!store) return null;
+
+      const response = await StoreApiService.updateStore(parseInt(id), { is_active: !store.ativo });
+      if (response.success && response.data) {
+        return convertApiStoreToStore(response.data);
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao alterar status da loja:', error);
+      return null;
+    }
   }
 }

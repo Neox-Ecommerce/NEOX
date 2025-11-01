@@ -178,13 +178,24 @@ export function RegisterPage() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowPassword(!showPassword);
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowPassword(!showPassword);
+                    }}
+                    className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent cursor-pointer"
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
+                      <EyeOff className="h-4 w-4 text-gray-400 pointer-events-none" />
                     ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
+                      <Eye className="h-4 w-4 text-gray-400 pointer-events-none" />
                     )}
                   </Button>
                 </div>
@@ -207,13 +218,24 @@ export function RegisterPage() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    tabIndex={-1}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowConfirmPassword(!showConfirmPassword);
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowConfirmPassword(!showConfirmPassword);
+                    }}
+                    className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent cursor-pointer"
+                    aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   >
                     {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
+                      <EyeOff className="h-4 w-4 text-gray-400 pointer-events-none" />
                     ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
+                      <Eye className="h-4 w-4 text-gray-400 pointer-events-none" />
                     )}
                   </Button>
                 </div>

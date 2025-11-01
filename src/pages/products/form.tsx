@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
 import { RoleGuard } from '@/components/RoleGuard';
-import { ProductForm } from '@/components/ProductForm';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ProductForm } from '@/components/products/ProductForm';
 import { Button } from '@/components/ui/button';
 import { ProductService } from '@/services/ProductService';
 import { FeedbackService } from '@/services/FeedbackService';
@@ -19,12 +20,12 @@ export function ProductFormPage() {
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', id],
-    queryFn: () => ProductService.getById(id!),
+    queryFn: () => ProductService.getProduct(id!),
     enabled: !!isEdit
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => ProductService.create(data, user?.lojaId || '1'),
+    mutationFn: (data: any) => ProductService.createProduct(data),
     onSuccess: () => {
       FeedbackService.success('Produto criado com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -39,7 +40,7 @@ export function ProductFormPage() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => 
-      ProductService.update(id, data),
+      ProductService.updateProduct(id, data),
     onSuccess: () => {
       FeedbackService.success('Produto atualizado com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -137,11 +138,13 @@ export function ProductFormPage() {
             </div>
           </div>
 
-          <ProductForm
-            product={product || undefined}
-            onSubmit={handleSubmit}
-            loading={isSubmitting}
-          />
+          <ErrorBoundary>
+            <ProductForm
+              product={product || undefined}
+              onSubmit={handleSubmit}
+              loading={isSubmitting}
+            />
+          </ErrorBoundary>
         </div>
       </AppShell>
     </RoleGuard>

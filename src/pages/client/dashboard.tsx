@@ -170,7 +170,10 @@ export function ClientDashboard() {
 
   const categories = ['Eletrônicos', 'Informática', 'Moda', 'Casa', 'Esportes', 'Livros'];
 
-  const filteredProducts = products.filter(product => {
+  // Garantir que products seja sempre um array válido
+  const productsArray = Array.isArray(products) ? products : [];
+
+  const filteredProducts = productsArray.filter(product => {
     const matchesSearch = searchQuery === '' || 
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.store.toLowerCase().includes(searchQuery.toLowerCase());
@@ -412,11 +415,13 @@ export function ClientDashboard() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as categorias</SelectItem>
-                  {categories.map((category) => (
+                  {Array.isArray(categories) && categories.length > 0 ? categories.map((category) => (
                     <SelectItem key={category} value={category}>
                       {category}
                     </SelectItem>
-                  ))}
+                  )) : (
+                    <SelectItem value="" disabled>Nenhuma categoria disponível</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

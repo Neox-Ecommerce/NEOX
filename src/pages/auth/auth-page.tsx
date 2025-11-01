@@ -1,149 +1,124 @@
 import React, { useState } from 'react';
-import { LoginForm } from './components/LoginForm';
-import { RegisterForm } from './components/RegisterForm';
-import { RoleSelector } from './components/RoleSelector';
-import { FloatingIcons } from './components/FloatingIcons';
-import { EntrepreneurRegistration } from './components/EntrepreneurRegistration';
-import { ArrowRight, Building } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { LoginForm, RegisterForm } from '@/components/auth/LoginForm';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ShoppingBag, Users, TrendingUp, Shield } from 'lucide-react';
 
-export type UserRole = 'cliente' | 'empreendedor';
-
-export interface UserRoles {
-  cliente: boolean;
-  empreendedor: boolean;
+interface AuthPageProps {
+  onSuccess: () => void;
 }
 
-export function AuthPage() {
-  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'entrepreneur'>('login');
-  const [showRoleSelector, setShowRoleSelector] = useState(false);
-  const [availableRoles] = useState<UserRoles>({ cliente: true, empreendedor: true }); // Mock data
-  const [selectedRole, setSelectedRole] = useState<UserRole>('cliente');
+export function AuthPage({ onSuccess }: AuthPageProps) {
+  const [isLogin, setIsLogin] = useState(true);
 
-  const handleLoginSuccess = (userRoles: UserRoles) => {
-    const roles = Object.entries(userRoles).filter(([_, hasRole]) => hasRole) as [UserRole, boolean][];
-    
-    if (roles.length > 1) {
-      setShowRoleSelector(true);
-    } else {
-      // Direct login with single role
-      console.log('Logging in with role:', roles[0][0]);
+  const features = [
+    {
+      icon: ShoppingBag,
+      title: 'Venda Online',
+      description: 'Crie sua loja virtual e venda seus produtos para todo o Brasil'
+    },
+    {
+      icon: Users,
+      title: 'Gestão de Clientes',
+      description: 'Gerencie seus clientes e construa relacionamentos duradouros'
+    },
+    {
+      icon: TrendingUp,
+      title: 'Analytics Avançado',
+      description: 'Acompanhe suas vendas e crescimento com relatórios detalhados'
+    },
+    {
+      icon: Shield,
+      title: 'Segurança Total',
+      description: 'Seus dados e transações protegidos com a melhor tecnologia'
     }
-  };
-
-  const handleRoleSelection = (role: UserRole) => {
-    setSelectedRole(role);
-    setShowRoleSelector(false);
-    console.log('Selected role:', role);
-  };
-
-  const handleEntrepreneurRegistration = () => {
-    setActiveTab('entrepreneur');
-  };
-
-  // Show entrepreneur registration flow
-  if (activeTab === 'entrepreneur') {
-    return <EntrepreneurRegistration />;
-  }
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-40 left-40 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
-      </div>
-
-      {/* Role Selector Modal */}
-      {showRoleSelector && (
-        <RoleSelector
-          availableRoles={availableRoles}
-          onRoleSelect={handleRoleSelection}
-          onClose={() => setShowRoleSelector(false)}
-        />
-      )}
-
-      <div className="w-full max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-center relative z-10">
-        {/* Left side - Auth Card */}
-        <div className="w-full max-w-md mx-auto lg:mx-0">
-          <div className="bg-white rounded-2xl shadow-xl p-8 backdrop-blur-sm border border-white/20">
-            {/* Logo and Title */}
-            <div className="text-center mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Neox</h1>
-              <p className="text-gray-600">Bem-vindo de volta</p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid lg:grid-cols-2 gap-8 items-center min-h-[calc(100vh-4rem)]">
+          {/* Left Side - Features */}
+          <div className="space-y-8">
+            <div className="text-center lg:text-left">
+              <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-4">
+                Bem-vindo ao{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+                  NEOX
+                </span>
+              </h1>
+              <p className="text-xl text-gray-600 mb-8">
+                A plataforma completa para empreendedores digitais
+              </p>
             </div>
 
-            {/* Tab Navigation */}
-            <div className="flex bg-gray-100 rounded-lg p-1 mb-8">
-              <button
-                onClick={() => setActiveTab('login')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
-                  activeTab === 'login'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Entrar
-              </button>
-              <button
-                onClick={() => setActiveTab('register')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
-                  activeTab === 'register'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Criar Conta
-              </button>
+            <div className="grid sm:grid-cols-2 gap-6">
+              {features.map((feature, index) => (
+                <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg">
+                        <feature.icon className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{feature.title}</h3>
+                        <p className="text-sm text-gray-600">{feature.description}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
-            {/* Form Content */}
-            <div className="transition-all duration-300 ease-in-out">
-              {activeTab === 'login' ? (
-                <LoginForm onLoginSuccess={handleLoginSuccess} />
-              ) : (
-                <RegisterForm onEntrepreneurRegistration={handleEntrepreneurRegistration} />
-              )}
+            <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl p-8 text-white">
+              <h3 className="text-2xl font-bold mb-4">Pronto para começar?</h3>
+              <p className="text-blue-100 mb-6">
+                Junte-se a milhares de empreendedores que já estão vendendo online
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <div className="text-center">
+                  <div className="text-3xl font-bold">10K+</div>
+                  <div className="text-sm text-blue-100">Lojas Ativas</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold">R$ 50M+</div>
+                  <div className="text-sm text-blue-100">Vendas Processadas</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold">99.9%</div>
+                  <div className="text-sm text-blue-100">Uptime</div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Right side - Enhanced Marketing Content */}
-        <div className="hidden lg:block">
-          <div className="relative h-96 flex flex-col justify-center">
-            <FloatingIcons />
-
-            {/* Main Content */}
-            <div className="text-center z-10 space-y-6">
-              <div>
-                <h2 className="text-4xl font-bold text-gray-800 mb-4 leading-tight">
-                  Crie sua loja digital
-                </h2>
-                <p className="text-lg text-gray-600 max-w-lg mx-auto leading-relaxed">
-                  Crie sua loja, gerencie tudo e comece a vender em minutos!
-                </p>
+          {/* Right Side - Auth Form */}
+          <div className="flex justify-center">
+            <div className="w-full max-w-md">
+              <div className="mb-8">
+                <div className="flex bg-gray-100 rounded-lg p-1">
+                  <Button
+                    variant={isLogin ? 'default' : 'ghost'}
+                    className="flex-1"
+                    onClick={() => setIsLogin(true)}
+                  >
+                    Entrar
+                  </Button>
+                  <Button
+                    variant={!isLogin ? 'default' : 'ghost'}
+                    className="flex-1"
+                    onClick={() => setIsLogin(false)}
+                  >
+                    Criar Conta
+                  </Button>
+                </div>
               </div>
 
-              {/* CTA Button */}
-              <Link to="/">
-                <button className="group inline-flex items-center space-x-2 bg-white border-2 border-green-600 text-green-600 px-6 py-3 rounded-lg font-medium hover:bg-green-600 hover:text-white transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105">
-                  <span>Conheça os Benefícios</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </button>
-              </Link>
-
-              {/* Entrepreneur CTA */}
-              <div className="mt-4">
-                <button
-                  onClick={handleEntrepreneurRegistration}
-                  className="group inline-flex items-center space-x-2 bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
-                >
-                  <Building className="w-4 h-4" />
-                  <span>Cadastro Completo de Empreendedor</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </button>
-              </div>
+              {isLogin ? (
+                <LoginForm onSuccess={onSuccess} onToggleForm={() => setIsLogin(false)} />
+              ) : (
+                <RegisterForm onSuccess={onSuccess} onToggleForm={() => setIsLogin(true)} />
+              )}
             </div>
           </div>
         </div>

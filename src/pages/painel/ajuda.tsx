@@ -166,6 +166,10 @@ export function AjudaPage() {
   const contactInfo = HelpService.getContactInfo();
   const faqCategories = HelpService.getFAQCategories();
   const tutorialCategories = HelpService.getTutorialCategories();
+  
+  // Garantir que sejam sempre arrays válidos
+  const faqCategoriesArray = Array.isArray(faqCategories) ? faqCategories : [];
+  const tutorialCategoriesArray = Array.isArray(tutorialCategories) ? tutorialCategories : [];
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -284,7 +288,7 @@ export function AjudaPage() {
                       >
                         Todas as categorias
                       </Button>
-                      {faqCategories.map((category) => (
+                      {faqCategoriesArray.length > 0 ? faqCategoriesArray.map((category) => (
                         <Button
                           key={category}
                           variant={selectedFAQCategory === category ? 'default' : 'ghost'}
@@ -293,7 +297,7 @@ export function AjudaPage() {
                         >
                           {category}
                         </Button>
-                      ))}
+                      )) : null}
                     </div>
                   </CardContent>
                 </Card>
@@ -573,7 +577,7 @@ export function AjudaPage() {
                       >
                         Todos os tutoriais
                       </Button>
-                      {tutorialCategories.map((category) => (
+                      {tutorialCategoriesArray.length > 0 ? tutorialCategoriesArray.map((category) => (
                         <Button
                           key={category}
                           variant={selectedTutorialCategory === category ? 'default' : 'ghost'}
@@ -582,7 +586,7 @@ export function AjudaPage() {
                         >
                           {category}
                         </Button>
-                      ))}
+                      )) : null}
                     </div>
                   </CardContent>
                 </Card>
