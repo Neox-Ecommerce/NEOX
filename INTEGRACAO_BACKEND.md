@@ -13,7 +13,7 @@ O projeto utiliza a variável `VITE_API_BASE_URL` para configurar a URL base da 
 Para configurar em desenvolvimento, crie um arquivo `.env.local` na raiz do projeto:
 
 ```env
-VITE_API_BASE_URL=http://localhost:8080/api
+VITE_API_BASE_URL=http://localhost:8000/api
 ```
 
 Para produção, configure a variável de ambiente no servidor de hospedagem.
