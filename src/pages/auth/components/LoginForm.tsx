@@ -90,9 +90,9 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
         <p className="text-xs font-medium text-blue-800 mb-1">Credenciais de demonstração:</p>
         <div className="text-xs text-blue-700 space-y-1">
-          <p><strong>Admin:</strong> admin@neox.com / 123456</p>
-          <p><strong>Empreendedor:</strong> lojista@neox.com / 123456</p>
-          <p><strong>Cliente:</strong> cliente@neox.com / 123456</p>
+          <p><strong>Admin:</strong> admin@neox.com / admin123</p>
+          <p><strong>Empreendedor:</strong> empreendedor@neox.com / senha123</p>
+          <p><strong>Cliente:</strong> cliente@neox.com / senha123</p>
         </div>
       </div>
 

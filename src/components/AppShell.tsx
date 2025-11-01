@@ -34,13 +34,24 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    // Carregar preferência do localStorage
+    const saved = localStorage.getItem('neox_dark_mode');
+    const isDark = saved === 'true';
+    // Aplicar classe no documento se necessário
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    }
+    return isDark;
+  });
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    localStorage.setItem('neox_dark_mode', String(newMode));
     document.documentElement.classList.toggle('dark');
   };
 

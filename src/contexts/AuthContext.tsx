@@ -18,9 +18,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const currentUser = AuthService.getCurrentUser();
-    setUser(currentUser);
-    setLoading(false);
+    try {
+      const currentUser = AuthService.getCurrentUser();
+      // Garantir que o ID seja string
+      if (currentUser && typeof currentUser.id !== 'string') {
+        currentUser.id = String(currentUser.id);
+      }
+      setUser(currentUser);
+    } catch (error) {
+      console.error('Erro ao carregar usuário:', error);
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {

@@ -14,7 +14,22 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   server: {
-    port: 5173,
-    host: true
-  }
+    port: 5175,
+    host: true,
+    hmr: {
+      overlay: true
+    },
+    watch: {
+      usePolling: true
+    }
+  },
+  build: {
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
+  },
+  cacheDir: '.vite'
 });

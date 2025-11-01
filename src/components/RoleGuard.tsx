@@ -20,7 +20,7 @@ export function RoleGuard({ children, requiredRole, redirectTo }: RoleGuardProps
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (user?.role !== requiredRole) {

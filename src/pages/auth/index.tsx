@@ -13,7 +13,7 @@ export interface UserRoles {
   empreendedor: boolean;
 }
 
-export function AuthPage() {
+function AuthPage() {
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'entrepreneur'>('login');
   const [showRoleSelector, setShowRoleSelector] = useState(false);
   const [availableRoles] = useState<UserRoles>({ cliente: true, empreendedor: true }); // Mock data
@@ -142,3 +142,6 @@ export function AuthPage() {
     </div>
   );
 }
+
+export { AuthPage };
+export default AuthPage;

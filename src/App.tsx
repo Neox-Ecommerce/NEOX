@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { Toaster } from '@/components/ui/toaster';
+// Import direto do default export - não usar lazy loading para evitar erros
+import AuthPage from '@/pages/auth/index';
 
 // Lazy load components
 const Dashboard = React.lazy(() => import('@/pages/painel/dashboard').then(m => ({ default: m.Dashboard })));
@@ -29,9 +31,6 @@ const ClientDashboard = React.lazy(() => import('@/pages/client/dashboard').then
 const StorePage = React.lazy(() => import('@/pages/client/store').then(m => ({ default: m.StorePage })));
 const ProductPage = React.lazy(() => import('@/pages/client/product').then(m => ({ default: m.ProductPage })));
 const CartPage = React.lazy(() => import('@/pages/client/cart').then(m => ({ default: m.CartPage })));
-
-// Auth pages
-const AuthPage = React.lazy(() => import('@/pages/auth').then(m => ({ default: m.AuthPage })));
 
 // Admin pages
 const AdminStoresPage = React.lazy(() => import('@/pages/admin/stores').then(m => ({ default: m.AdminStoresPage })));
