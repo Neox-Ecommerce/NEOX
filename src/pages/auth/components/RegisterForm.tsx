@@ -67,10 +67,11 @@ export function RegisterForm({ onEntrepreneurRegistration }: RegisterFormProps) 
         const userData = {
           name: formData.fullName,
           email: formData.email,
+          password: formData.password,
           role: 'CLIENTE' as const,
           phone: ''
         };
-        
+
         await registerUser(userData);
         
         FeedbackService.success('Conta criada com sucesso!');

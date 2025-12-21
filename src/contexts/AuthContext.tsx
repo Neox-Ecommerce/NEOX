@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AuthService, User } from '@/services/AuthService';
+import { AuthService, User, RegisterData } from '@/services/AuthService';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<User>;
   logout: () => void;
-  register: (userData: Omit<User, 'id'>) => Promise<User>;
+  register: (userData: RegisterData) => Promise<User>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   loading: boolean;
 }
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
-  const register = async (userData: Omit<User, 'id'>): Promise<User> => {
+  const register = async (userData: RegisterData): Promise<User> => {
     const newUser = await AuthService.register(userData);
     setUser(newUser);
     return newUser;

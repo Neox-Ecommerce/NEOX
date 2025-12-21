@@ -1,8 +1,21 @@
+import { apiClient } from '@/lib/api/client';
+import { API_CONFIG } from '@/lib/api/config';
+
 interface Store {
   id: string;
+  name: string;
+  cnpj: string;
+  description?: string;
+  is_verified: boolean;
+  owner_id: string;
+  created_at?: Date;
+  updated_at?: Date;
+}
+
+// Interface estendida para compatibilidade com UI antiga
+interface StoreExtended extends Store {
   nomeFantasia: string;
   razaoSocial: string;
-  cnpj: string;
   cnpjVerificado: boolean;
   segmento: string;
   categoriaTributaria: string;
@@ -10,79 +23,99 @@ interface Store {
   endereco?: string;
   telefone?: string;
   descricaoLoja?: string;
-  horarioFuncionamento: {
+  horarioFuncionamento?: {
     [key: string]: {
       ativo: boolean;
       abertura: string;
       fechamento: string;
     };
   };
-  redesSociais: {
+  redesSociais?: {
     instagram?: string;
     facebook?: string;
     whatsapp?: string;
     website?: string;
   };
-  tiposEntrega: string[];
+  tiposEntrega?: string[];
 }
 
 export class StoreService {
-  private static STORE_KEY = 'neox_store';
-
-  private static store: Store = {
-    id: '1',
-    nomeFantasia: 'TechStore Premium',
-    razaoSocial: 'TechStore Premium Comércio de Eletrônicos LTDA',
-    cnpj: '12.345.678/0001-90',
-    cnpjVerificado: false,
-    segmento: 'Eletrônicos',
-    categoriaTributaria: 'Simples Nacional',
-    logo: 'https://images.pexels.com/photos/1029757/pexels-photo-1029757.jpeg?auto=compress&cs=tinysrgb&w=150',
-    endereco: 'Rua das Flores, 123 - São Paulo, SP',
-    telefone: '(11) 3333-4444',
-    descricaoLoja: 'Loja especializada em produtos eletrônicos de alta qualidade com os melhores preços do mercado.',
-    horarioFuncionamento: {
-      segunda: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      terca: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      quarta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      quinta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      sexta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      sabado: { ativo: true, abertura: '09:00', fechamento: '17:00' },
-      domingo: { ativo: false, abertura: '09:00', fechamento: '17:00' }
-    },
-    redesSociais: {
-      instagram: '@techstore_premium',
-      facebook: 'TechStorePremium',
-      whatsapp: '5511999999999',
-      website: 'https://techstore.com.br'
-    },
-    tiposEntrega: ['Delivery próprio', 'Retirada no local']
-  };
-
-  static async getStore(): Promise<Store> {
-    const stored = localStorage.getItem(this.STORE_KEY);
-    if (stored) {
-      this.store = JSON.parse(stored);
-    }
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { ...this.store };
+  private static convertToExtended(store: Store): StoreExtended {
+    // Converte formato da API para formato esperado pela UI
+    return {
+      ...store,
+      nomeFantasia: store.name,
+      razaoSocial: store.description || store.name,
+      cnpjVerificado: store.is_verified,
+      segmento: 'Eletrônicos',
+      categoriaTributaria: 'Simples Nacional',
+      descricaoLoja: store.description,
+      horarioFuncionamento: {
+        segunda: { ativo: true, abertura: '08:00', fechamento: '18:00' },
+        terca: { ativo: true, abertura: '08:00', fechamento: '18:00' },
+        quarta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
+        quinta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
+        sexta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
+        sabado: { ativo: true, abertura: '09:00', fechamento: '17:00' },
+        domingo: { ativo: false, abertura: '09:00', fechamento: '17:00' }
+      },
+      redesSociais: {},
+      tiposEntrega: ['Delivery próprio', 'Retirada no local']
+    };
   }
 
-  static async updateStore(data: Partial<Store>): Promise<Store> {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    const currentStore = await this.getStore();
-    this.store = { ...currentStore, ...data };
+  static async getStore(): Promise<StoreExtended> {
+    try {
+      // Busca loja do usuário atual na API
+      const store = await apiClient.get<Store>(`${API_CONFIG.ENDPOINTS.STORE}/my-store`);
+      return this.convertToExtended(store);
+    } catch (error: any) {
+      // Se não encontrar loja (404), retornar null ou objeto vazio
+      if (error.status === 404) {
+        throw new Error('Loja não encontrada. Por favor, cadastre sua loja.');
+      }
+      console.error('Erro ao buscar loja:', error);
+      throw new Error(error.message || 'Erro ao buscar dados da loja.');
+    }
+  }
 
-    localStorage.setItem(this.STORE_KEY, JSON.stringify(this.store));
+  static async createStore(data: { name: string; cnpj: string; description?: string }): Promise<StoreExtended> {
+    try {
+      const store = await apiClient.post<Store>(API_CONFIG.ENDPOINTS.STORE, data);
+      return this.convertToExtended(store);
+    } catch (error: any) {
+      console.error('Erro ao criar loja:', error);
+      throw new Error(error.message || 'Erro ao criar loja.');
+    }
+  }
 
-    return { ...this.store };
+  static async updateStore(data: Partial<{ name: string; cnpj: string; description: string }>): Promise<StoreExtended> {
+    try {
+      // Primeiro busca a loja para pegar o ID
+      const currentStore = await apiClient.get<Store>(`${API_CONFIG.ENDPOINTS.STORE}/my-store`);
+
+      // Atualiza a loja
+      const updatedStore = await apiClient.put<Store>(
+        `${API_CONFIG.ENDPOINTS.STORE}/${currentStore.id}`,
+        data
+      );
+
+      return this.convertToExtended(updatedStore);
+    } catch (error: any) {
+      console.error('Erro ao atualizar loja:', error);
+      throw new Error(error.message || 'Erro ao atualizar loja.');
+    }
   }
 
   static async uploadDocument(file: File, description: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    // Simular upload e verificação
-    this.store.cnpjVerificado = true;
-    localStorage.setItem(this.STORE_KEY, JSON.stringify(this.store));
+    try {
+      // TODO: Implementar upload de documentos quando backend tiver endpoint
+      console.warn('Upload de documentos ainda não implementado no backend');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (error: any) {
+      console.error('Erro ao fazer upload do documento:', error);
+      throw new Error(error.message || 'Erro ao fazer upload do documento.');
+    }
   }
 
   static getSegmentos(): string[] {

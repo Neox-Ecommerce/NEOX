@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
@@ -16,12 +16,15 @@ export default defineConfig({
   server: {
     port: 5175,
     host: true,
+    strictPort: false,
     hmr: {
-      overlay: true
+      overlay: true,
+      clientPort: 5175
     },
     watch: {
       usePolling: true
-    }
+    },
+    cors: true
   },
   build: {
     sourcemap: true,

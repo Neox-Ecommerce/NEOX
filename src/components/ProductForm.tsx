@@ -38,13 +38,41 @@ interface ProductFormProps {
   loading?: boolean;
 }
 
-const categorias = ProductService.getCategories();
-
 export function ProductForm({ product, onSubmit, loading = false }: ProductFormProps) {
+  const [categorias, setCategorias] = useState<string[]>([]);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [precoDisplay, setPrecoDisplay] = useState<string>('');
   const [dragActive, setDragActive] = useState(false);
   const [imageError, setImageError] = useState<string>('');
+
+  // Carregar categorias ao montar o componente
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const cats = await ProductService.getCategories();
+        setCategorias(cats);
+      } catch (error) {
+        console.error('Erro ao carregar categorias:', error);
+        // Fallback para categorias padrão em caso de erro
+        setCategorias([
+          'Eletrônicos',
+          'Informática',
+          'Moda e Acessórios',
+          'Casa e Jardim',
+          'Esportes e Lazer',
+          'Livros e Papelaria',
+          'Alimentação',
+          'Saúde e Beleza',
+          'Automotivo',
+          'Brinquedos',
+          'Móveis',
+          'Outros'
+        ]);
+      }
+    };
+    loadCategories();
+  }, []);
+
 
   const {
     register,
@@ -101,18 +129,18 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
     if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
       return 'Formato de imagem não suportado. Use JPG, PNG ou WebP.';
     }
-    
+
     if (file.size > MAX_FILE_SIZE) {
       return 'Imagem muito grande. Máximo 5MB.';
     }
-    
+
     return null;
   };
 
   const handleImageUpload = (file: File) => {
     setImageError('');
     clearErrors('imagem');
-    
+
     const error = validateImage(file);
     if (error) {
       setImageError(error);
@@ -150,7 +178,7 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     const file = e.dataTransfer.files?.[0];
     if (file) {
       handleImageUpload(file);
@@ -168,7 +196,7 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
     const value = event.target.value;
     const numericValue = value.replace(/[^\d]/g, '');
     const formattedValue = formatCurrency(parseFloat(numericValue) / 100 || 0);
-    
+
     setPrecoDisplay(formattedValue);
     setValue('preco', parseFloat(numericValue) / 100 || 0);
   };
@@ -182,7 +210,7 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
       peso: data.peso ? Number(data.peso) : undefined,
       desconto: data.desconto ? Number(data.desconto) : undefined
     };
-    
+
     await onSubmit(processedData);
   };
 
@@ -200,13 +228,13 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
             {/* Upload de Imagem */}
             <div className="space-y-4">
               <Label className="text-base font-semibold">Imagem do Produto</Label>
-              
+
               {imagePreview ? (
                 <div className="relative">
                   <div className="relative w-full h-64 rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700">
-                    <img 
-                      src={imagePreview} 
-                      alt="Preview do produto" 
+                    <img
+                      src={imagePreview}
+                      alt="Preview do produto"
                       className="w-full h-full object-cover"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -225,11 +253,10 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
                 </div>
               ) : (
                 <div
-                  className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
-                    dragActive 
-                      ? 'border-primary bg-primary/5' 
+                  className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-colors ${dragActive
+                      ? 'border-primary bg-primary/5'
                       : 'border-gray-300 dark:border-gray-600 hover:border-primary hover:bg-primary/5'
-                  } ${imageError ? 'border-red-500 bg-red-50' : ''}`}
+                    } ${imageError ? 'border-red-500 bg-red-50' : ''}`}
                   onDragEnter={handleDrag}
                   onDragLeave={handleDrag}
                   onDragOver={handleDrag}
@@ -261,14 +288,14 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
                   </div>
                 </div>
               )}
-              
+
               {(imageError || errors.imagem) && (
                 <p className="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle className="h-3 w-3" />
                   {imageError || errors.imagem?.message}
                 </p>
               )}
-              
+
               <p className="text-xs text-gray-500">
                 Formatos aceitos: JPG, PNG, WebP. Tamanho máximo: 5MB
               </p>
@@ -299,8 +326,8 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
                   <Label htmlFor="categoria" className="text-sm font-medium">
                     Categoria *
                   </Label>
-                  <Select 
-                    value={watch('categoria')} 
+                  <Select
+                    value={watch('categoria')}
                     onValueChange={(value) => setValue('categoria', value)}
                   >
                     <SelectTrigger className="h-11">
@@ -496,8 +523,8 @@ export function ProductForm({ product, onSubmit, loading = false }: ProductFormP
               >
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={loading}
                 className="flex-1 h-11 bg-primary hover:bg-primary-hover"
               >

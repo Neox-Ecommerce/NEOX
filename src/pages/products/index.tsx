@@ -11,13 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
 import {
   Dialog,
@@ -57,6 +57,11 @@ export function ProductsPage() {
   const { data: categoryCounts = {} } = useQuery({
     queryKey: ['category-counts', user?.lojaId],
     queryFn: () => ProductService.getCategoryCounts(user?.lojaId || '1')
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => ProductService.getCategories()
   });
 
   const deleteMutation = useMutation({
@@ -174,14 +179,14 @@ export function ProductsPage() {
   // Filtrar e ordenar produtos
   const filteredProducts = products
     .filter(product => {
-      const matchesSearch = debouncedSearch === '' || 
+      const matchesSearch = debouncedSearch === '' ||
         product.nome.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         product.descricao.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         product.marca?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         product.sku?.toLowerCase().includes(debouncedSearch.toLowerCase());
-      
+
       const matchesCategory = selectedCategory === 'all' || product.categoria === selectedCategory;
-      
+
       return matchesSearch && matchesCategory;
     })
     .sort((a, b) => {
@@ -195,8 +200,6 @@ export function ProductsPage() {
           return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       }
     });
-
-  const categories = ProductService.getCategories();
 
   if (isLoading) {
     return (
@@ -245,7 +248,7 @@ export function ProductsPage() {
                   className="pl-10"
                 />
               </div>
-              
+
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="w-full lg:w-48">
                   <Filter className="h-4 w-4 mr-2" />
@@ -287,7 +290,7 @@ export function ProductsPage() {
                   </TooltipTrigger>
                   <TooltipContent>Visualizar em grade</TooltipContent>
                 </Tooltip>
-                
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -330,8 +333,8 @@ export function ProductsPage() {
               <div className="text-center py-12">
                 <Package className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-                  {searchQuery || selectedCategory !== 'all' 
-                    ? 'Nenhum produto encontrado' 
+                  {searchQuery || selectedCategory !== 'all'
+                    ? 'Nenhum produto encontrado'
                     : 'Nenhum produto cadastrado'
                   }
                 </h3>
@@ -371,7 +374,7 @@ export function ProductsPage() {
                           <div className="absolute top-2 left-2 z-10">
                             <Checkbox
                               checked={selectedProducts.includes(product.id)}
-                              onCheckedChange={(checked) => 
+                              onCheckedChange={(checked) =>
                                 handleProductSelect(product.id, checked as boolean)
                               }
                             />
@@ -410,7 +413,7 @@ export function ProductsPage() {
                       </TableHeader>
                       <TableBody>
                         {filteredProducts.map((product) => {
-                          const precoComDesconto = product.desconto 
+                          const precoComDesconto = product.desconto
                             ? product.preco * (1 - product.desconto / 100)
                             : product.preco;
 
@@ -419,7 +422,7 @@ export function ProductsPage() {
                               <TableCell>
                                 <Checkbox
                                   checked={selectedProducts.includes(product.id)}
-                                  onCheckedChange={(checked) => 
+                                  onCheckedChange={(checked) =>
                                     handleProductSelect(product.id, checked as boolean)
                                   }
                                 />
@@ -428,8 +431,8 @@ export function ProductsPage() {
                                 <div className="flex items-center space-x-3">
                                   <div className="h-12 w-12 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
                                     {product.imagem ? (
-                                      <img 
-                                        src={product.imagem} 
+                                      <img
+                                        src={product.imagem}
                                         alt={product.nome}
                                         className="h-full w-full object-cover"
                                       />
@@ -472,23 +475,21 @@ export function ProductsPage() {
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-                                    product.estoque > 10 
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                      : product.estoque > 0
+                                  <span className={`inline-block px-2 py-1 text-xs rounded-full ${product.estoque > 10
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                    : product.estoque > 0
                                       ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
                                       : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-                                  }`}>
+                                    }`}>
                                     {product.estoque} unidades
                                   </span>
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-                                  product.ativo 
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
-                                }`}>
+                                <span className={`inline-block px-2 py-1 text-xs rounded-full ${product.ativo
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+                                  }`}>
                                   {product.ativo ? 'Ativo' : 'Inativo'}
                                 </span>
                               </TableCell>
@@ -550,8 +551,8 @@ export function ProductsPage() {
                   <Button variant="outline" onClick={() => setDeleteId(null)}>
                     Cancelar
                   </Button>
-                  <Button 
-                    variant="destructive" 
+                  <Button
+                    variant="destructive"
                     onClick={confirmDelete}
                     disabled={deleteMutation.isPending}
                   >

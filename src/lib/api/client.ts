@@ -120,12 +120,18 @@ class ApiClient {
    */
   private async refreshAccessToken(): Promise<string | null> {
     try {
+      const refreshToken = localStorage.getItem('neox_refresh_token');
+
+      if (!refreshToken) {
+        return null;
+      }
+
       const response = await fetch(`${this.baseURL}${API_CONFIG.ENDPOINTS.AUTH.REFRESH}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getToken()}`
-        }
+        },
+        body: JSON.stringify({ refreshToken })
       });
 
       if (!response.ok) {
@@ -199,6 +205,7 @@ class ApiClient {
         } else {
           // Refresh falhou, fazer logout
           localStorage.removeItem('neox_token');
+          localStorage.removeItem('neox_refresh_token');
           localStorage.removeItem('neox_user');
           if (window.location.pathname !== '/auth') {
             window.location.href = '/auth';

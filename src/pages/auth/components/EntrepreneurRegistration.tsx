@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { StoreService } from '@/services/StoreService';
+import { FeedbackService } from '@/services/FeedbackService';
 import { PersonalDataStep } from './registration/PersonalDataStep';
 import { StoreDataStep } from './registration/StoreDataStep';
 import { VerificationStep } from './registration/VerificationStep';
@@ -34,7 +37,9 @@ export interface RegistrationData {
 
 export function EntrepreneurRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { register: registerUser } = useAuth();
   const [registrationData, setRegistrationData] = useState<RegistrationData>({
     personal: {
       fullName: '',
@@ -76,17 +81,45 @@ export function EntrepreneurRegistration() {
   };
 
   const handleRegistrationSubmit = async () => {
+    setIsSubmitting(true);
     try {
-      // Here you would submit to your API
-      console.log('Submitting registration:', registrationData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // 1. Registrar usuário como EMPREENDEDOR
+      const userData = {
+        name: registrationData.personal.fullName,
+        email: registrationData.personal.email,
+        password: registrationData.personal.password,
+        role: 'EMPREENDEDOR' as const,
+        phone: ''
+      };
+
+      await registerUser(userData);
+
+      // 2. Criar loja
+      const storeData = {
+        name: registrationData.store.storeName,
+        cnpj: registrationData.store.cnpj,
+        description: `Loja ${registrationData.store.storeName}`
+      };
+
+      await StoreService.createStore(storeData);
+
+      // 3. Upload de documentos (se houver)
+      if (registrationData.verification.document) {
+        await StoreService.uploadDocument(
+          registrationData.verification.document,
+          'Documento de verificação'
+        );
+      }
+
+      FeedbackService.success('Cadastro realizado com sucesso!');
+
       // Move to success step
       setCurrentStep(4);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration failed:', error);
+      FeedbackService.error(error.message || 'Erro ao realizar cadastro. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

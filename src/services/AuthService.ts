@@ -43,8 +43,11 @@ export class AuthService {
         id: String(response.user.id || '')
       };
 
-      // Salvar token e usuário
+      // Salvar token, refresh token e usuário
       apiClient.setToken(response.token);
+      if (response.refreshToken) {
+        localStorage.setItem('neox_refresh_token', response.refreshToken);
+      }
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(user));
 
       return user;
@@ -63,6 +66,7 @@ export class AuthService {
     // Limpar dados locais
     apiClient.clearToken();
     localStorage.removeItem(this.STORAGE_KEY);
+    localStorage.removeItem('neox_refresh_token');
   }
 
   static getCurrentUser(): User | null {
@@ -97,8 +101,11 @@ export class AuthService {
         id: String(response.user.id || '')
       };
 
-      // Salvar token e usuário
+      // Salvar token, refresh token e usuário
       apiClient.setToken(response.token);
+      if (response.refreshToken) {
+        localStorage.setItem('neox_refresh_token', response.refreshToken);
+      }
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(user));
 
       return user;
@@ -132,7 +139,7 @@ export class AuthService {
     try {
       await apiClient.post(
         API_CONFIG.ENDPOINTS.AUTH.CHANGE_PASSWORD,
-        { userId, currentPassword, newPassword }
+        { currentPassword, newPassword }
       );
     } catch (error: any) {
       const message = error.message || 'Erro ao alterar senha.';
