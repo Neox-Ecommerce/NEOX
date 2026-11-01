@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,10 +11,12 @@ interface ChartData {
 interface RevenueChartProps {
   data: ChartData[];
   isLoading?: boolean;
+  period: number;
+  onPeriodChange: (period: number) => void;
 }
 
-export function RevenueChart({ data, isLoading }: RevenueChartProps) {
-  const [period, setPeriod] = useState('30');
+export function RevenueChart({ data, isLoading, period, onPeriodChange }: RevenueChartProps) {
+  const isEmpty = data.every((d) => d.receita === 0 && d.visitas === 0);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -26,17 +27,15 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
     }).format(value);
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-  };
+  // "YYYY-MM-DD" é dia local; new Date() leria como UTC e mostraria o dia anterior
+  const formatDate = (dateStr: string) => `${dateStr.slice(8, 10)}/${dateStr.slice(5, 7)}`;
 
   if (isLoading) {
     return (
       <Card className="col-span-full">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Receita vs Visitas (últimos 30 dias)</CardTitle>
+            <CardTitle>Receita vs Visitas (últimos {period} dias)</CardTitle>
             <div className="h-10 w-32 bg-muted animate-pulse rounded-md"></div>
           </div>
         </CardHeader>
@@ -52,7 +51,7 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Receita vs Visitas (últimos {period} dias)</CardTitle>
-          <Select value={period} onValueChange={setPeriod}>
+          <Select value={String(period)} onValueChange={(v) => onPeriodChange(Number(v))}>
             <SelectTrigger className="w-32">
               <SelectValue />
             </SelectTrigger>
@@ -65,7 +64,12 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-80">
+        <div className="h-80 relative">
+          {isEmpty && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center text-sm text-muted-foreground">
+              Ainda não há vendas pagas nem visitas registradas neste período.
+            </div>
+          )}
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Store, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { StoreData } from '../EntrepreneurRegistration';
+import { api, ApiError } from '@/lib/api';
 
 interface StoreDataStepProps {
   data: StoreData;
@@ -13,8 +14,8 @@ export function StoreDataStep({ data, onComplete, onBack }: StoreDataStepProps) 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isCheckingStoreName, setIsCheckingStoreName] = useState(false);
   const [isCheckingCnpj, setIsCheckingCnpj] = useState(false);
-  const [storeNameDebounceTimer, setStoreNameDebounceTimer] = useState<NodeJS.Timeout | null>(null);
-  const [cnpjDebounceTimer, setCnpjDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [storeNameDebounceTimer, setStoreNameDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [cnpjDebounceTimer, setCnpjDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const formatCNPJ = (value: string) => {
     const digits = value.replace(/\D/g, '');
@@ -65,8 +66,7 @@ export function StoreDataStep({ data, onComplete, onBack }: StoreDataStepProps) 
     setIsCheckingStoreName(true);
     
     try {
-      // Mock response for demo - in production, handle actual API errors
-      const isAvailable = Math.random() > 0.3; // 70% chance of being available
+      const { available: isAvailable } = await api<{ available: boolean }>('/auth/store-name-available', { query: { name: storeName } });
       
       if (!isAvailable) {
         setErrors(prev => ({ ...prev, storeName: 'Este nome de loja já está em uso' }));
@@ -88,24 +88,22 @@ export function StoreDataStep({ data, onComplete, onBack }: StoreDataStepProps) 
     setIsCheckingCnpj(true);
     
     try {
-      // Mock response for demo
-      const mockCompanies = [
-        'EMPRESA EXEMPLO LTDA',
-        'COMERCIO E SERVICOS DEMO EIRELI',
-        'INDUSTRIA MODELO S.A.',
-        'PRESTADORA DE SERVICOS TESTE LTDA'
-      ];
-      
-      const randomCompany = mockCompanies[Math.floor(Math.random() * mockCompanies.length)];
-      
+      let companyName = '';
+      try {
+        companyName = (await api<{ companyName: string }>(`/auth/cnpj/${cnpj.replace(/\D/g, '')}`)).companyName;
+      } catch (error) {
+        // Receita fora do ar (502): CNPJ com dígitos válidos segue, sem razão social
+        if (!(error instanceof ApiError) || error.status !== 502) throw error;
+      }
+
       setFormData(prev => ({ 
         ...prev, 
-        companyName: randomCompany,
+        companyName,
         isCnpjValid: true 
       }));
       setErrors(prev => ({ ...prev, cnpj: '' }));
     } catch (error) {
-      setErrors(prev => ({ ...prev, cnpj: 'CNPJ não encontrado na Receita Federal' }));
+      setErrors(prev => ({ ...prev, cnpj: error instanceof Error ? error.message : 'CNPJ não encontrado na Receita Federal' }));
       setFormData(prev => ({ ...prev, companyName: '', isCnpjValid: false }));
     } finally {
       setIsCheckingCnpj(false);

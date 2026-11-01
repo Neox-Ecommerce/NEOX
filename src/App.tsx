@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { Toaster } from '@/components/ui/toaster';
+import { RoleGuard } from '@/components/RoleGuard';
 
 // Lazy load components
 const Dashboard = React.lazy(() => import('@/pages/painel/dashboard').then(m => ({ default: m.Dashboard })));
@@ -29,6 +30,7 @@ const ClientDashboard = React.lazy(() => import('@/pages/client/dashboard').then
 const StorePage = React.lazy(() => import('@/pages/client/store').then(m => ({ default: m.StorePage })));
 const ProductPage = React.lazy(() => import('@/pages/client/product').then(m => ({ default: m.ProductPage })));
 const CartPage = React.lazy(() => import('@/pages/client/cart').then(m => ({ default: m.CartPage })));
+const CheckoutReturnPage = React.lazy(() => import('@/pages/client/checkout-return').then(m => ({ default: m.CheckoutReturnPage })));
 
 // Auth pages
 const AuthPage = React.lazy(() => import('@/pages/auth').then(m => ({ default: m.AuthPage })));
@@ -66,10 +68,11 @@ function App() {
                 
                 {/* Client Routes */}
                 <Route path="/" element={<ClientHomePage />} />
-                <Route path="/cliente" element={<ClientDashboard />} />
+                <Route path="/cliente" element={<RoleGuard requiredRole="CLIENTE"><ClientDashboard /></RoleGuard>} />
                 <Route path="/lojas/:id" element={<StorePage />} />
                 <Route path="/produto/:id" element={<ProductPage />} />
-                <Route path="/carrinho" element={<CartPage />} />
+                <Route path="/carrinho" element={<RoleGuard requiredRole="CLIENTE"><CartPage /></RoleGuard>} />
+                <Route path="/checkout/retorno" element={<RoleGuard requiredRole="CLIENTE"><CheckoutReturnPage /></RoleGuard>} />
                 
                 {/* Painel do Empreendedor */}
                 <Route path="/painel" element={<Navigate to="/painel/dashboard" replace />} />

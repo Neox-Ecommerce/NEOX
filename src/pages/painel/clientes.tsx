@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { 
   Users, 
   Search, 
@@ -48,7 +48,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ClientsService } from '@/services/ClientsService';
+import { ClientsService, Client } from '@/services/ClientsService';
 import { FeedbackService } from '@/services/FeedbackService';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/utils';
@@ -56,24 +56,23 @@ import { formatCurrency } from '@/lib/utils';
 export function ClientesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedClient, setSelectedClient] = useState<any>(null);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [clientDetailsOpen, setClientDetailsOpen] = useState(false);
 
   const { user } = useAuth();
-  const queryClient = useQueryClient();
 
   const { data: clients = [], isLoading } = useQuery({
     queryKey: ['clients', user?.lojaId],
-    queryFn: () => ClientsService.getClients(user?.lojaId || '1')
+    queryFn: () => ClientsService.getClients()
   });
 
   const { data: clientStats } = useQuery({
     queryKey: ['client-stats', user?.lojaId],
-    queryFn: () => ClientsService.getClientStats(user?.lojaId || '1')
+    queryFn: () => ClientsService.getClientStats()
   });
 
   const exportClientsMutation = useMutation({
-    mutationFn: ClientsService.exportClients,
+    mutationFn: async () => ClientsService.exportClients(filteredClients),
     onSuccess: (blob) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -90,7 +89,7 @@ export function ClientesPage() {
     }
   });
 
-  const handleViewClient = (client: any) => {
+  const handleViewClient = (client: Client) => {
     setSelectedClient(client);
     setClientDetailsOpen(true);
   };
@@ -127,7 +126,7 @@ export function ClientesPage() {
     );
   };
 
-  const getClientSegment = (client: any) => {
+  const getClientSegment = (client: Client) => {
     if (client.totalSpent > 10000) return { label: 'VIP', color: 'bg-purple-100 text-purple-800' };
     if (client.totalSpent > 5000) return { label: 'Premium', color: 'bg-blue-100 text-blue-800' };
     if (client.totalOrders > 5) return { label: 'Fidelizado', color: 'bg-green-100 text-green-800' };

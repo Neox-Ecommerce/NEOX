@@ -1,14 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Package, 
   AlertTriangle, 
-  TrendingUp, 
   TrendingDown, 
   Search, 
   Filter,
   Download,
-  Upload,
   Plus,
   Minus,
   Edit,
@@ -46,7 +44,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { InventoryService } from '@/services/InventoryService';
+import { InventoryService, InventoryItem } from '@/services/InventoryService';
 import { FeedbackService } from '@/services/FeedbackService';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/utils';
@@ -54,7 +52,7 @@ import { formatCurrency } from '@/lib/utils';
 export function EstoquePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
   const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
   const [adjustmentData, setAdjustmentData] = useState({
     type: 'add' as 'add' | 'remove',
@@ -68,17 +66,17 @@ export function EstoquePage() {
 
   const { data: inventory = [], isLoading } = useQuery({
     queryKey: ['inventory', user?.lojaId],
-    queryFn: () => InventoryService.getInventory(user?.lojaId || '1')
+    queryFn: () => InventoryService.getInventory()
   });
 
   const { data: movements = [] } = useQuery({
     queryKey: ['inventory-movements', user?.lojaId],
-    queryFn: () => InventoryService.getMovements(user?.lojaId || '1')
+    queryFn: () => InventoryService.getMovements()
   });
 
   const { data: alerts = [] } = useQuery({
     queryKey: ['inventory-alerts', user?.lojaId],
-    queryFn: () => InventoryService.getAlerts(user?.lojaId || '1')
+    queryFn: () => InventoryService.getAlerts()
   });
 
   const adjustInventoryMutation = useMutation({
@@ -92,12 +90,12 @@ export function EstoquePage() {
       setSelectedProduct(null);
       setAdjustmentData({ type: 'add', quantity: '', reason: '', cost: '' });
     },
-    onError: () => {
-      FeedbackService.error('Erro ao ajustar estoque');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao ajustar estoque');
     }
   });
 
-  const handleAdjustment = (product: any) => {
+  const handleAdjustment = (product: InventoryItem) => {
     setSelectedProduct(product);
     setAdjustmentModalOpen(true);
   };
@@ -130,7 +128,7 @@ export function EstoquePage() {
     return matchesSearch && matchesStatus;
   });
 
-  const getStockStatus = (item: any) => {
+  const getStockStatus = (item: InventoryItem) => {
     if (item.currentStock === 0) return { label: 'Esgotado', variant: 'destructive' as const };
     if (item.currentStock <= item.minStock) return { label: 'Estoque Baixo', variant: 'warning' as const };
     return { label: 'Normal', variant: 'success' as const };
@@ -176,15 +174,22 @@ export function EstoquePage() {
             </div>
             
             <div className="flex items-center gap-3">
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => {
+                const url = URL.createObjectURL(InventoryService.exportInventory(filteredInventory));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `estoque-${new Date().toISOString().split('T')[0]}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}>
                 <Download className="h-4 w-4 mr-2" />
                 Exportar
               </Button>
-              <Button variant="outline">
-                <Upload className="h-4 w-4 mr-2" />
-                Importar
-              </Button>
-              <Button>
+              <Button onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['inventory'] });
+                queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
+                queryClient.invalidateQueries({ queryKey: ['inventory-alerts'] });
+              }}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Atualizar
               </Button>

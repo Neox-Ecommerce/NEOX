@@ -1,25 +1,20 @@
 import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  Video, 
-  Upload, 
-  Play, 
-  Pause, 
-  Eye, 
-  Heart, 
-  Share2, 
+import {
+  Video,
+  Upload,
+  Play,
+  Eye,
+  Heart,
+  Share2,
   MessageCircle,
   TrendingUp,
-  Calendar,
-  Clock,
-  Users,
-  BarChart3,
+  Trash2,
   Plus,
   X,
   FileVideo,
   Image as ImageIcon,
   Sparkles,
-  Target,
   Zap
 } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
@@ -40,15 +35,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { TrendsService } from '@/services/TrendsService';
+import { TrendsService, Trend } from '@/services/TrendsService';
 import { FeedbackService } from '@/services/FeedbackService';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/utils';
+
+const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime'];
+
+const STATUS_BADGE: Record<Trend['status'], { variant: 'success' | 'warning' | 'destructive'; label: string }> = {
+  published: { variant: 'success', label: 'Publicado' },
+  processing: { variant: 'warning', label: 'Processando' },
+  rejected: { variant: 'destructive', label: 'Rejeitado' },
+  removed: { variant: 'destructive', label: 'Removido' },
+};
 
 export function TrendsPage() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string>('');
+  const [videoDuration, setVideoDuration] = useState(0); // lido do <video> (loadedmetadata)
   const [trendData, setTrendData] = useState({
     title: '',
     description: '',
@@ -62,20 +67,21 @@ export function TrendsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const storeKey = user?.lojaId;
 
   const { data: trends = [], isLoading } = useQuery({
-    queryKey: ['trends', user?.lojaId],
-    queryFn: () => TrendsService.getMyTrends(user?.lojaId || '1')
+    queryKey: ['trends', storeKey],
+    queryFn: () => TrendsService.getMyTrends()
   });
 
   const { data: trendStats } = useQuery({
-    queryKey: ['trend-stats', user?.lojaId],
-    queryFn: () => TrendsService.getTrendStats(user?.lojaId || '1')
+    queryKey: ['trend-stats', storeKey],
+    queryFn: () => TrendsService.getTrendStats()
   });
 
   const { data: products = [] } = useQuery({
-    queryKey: ['products-for-trends', user?.lojaId],
-    queryFn: () => TrendsService.getProductsForTrends(user?.lojaId || '1')
+    queryKey: ['products-for-trends', storeKey],
+    queryFn: () => TrendsService.getProductsForTrends()
   });
 
   const uploadTrendMutation = useMutation({
@@ -86,42 +92,56 @@ export function TrendsPage() {
       FeedbackService.success('Trend publicado com sucesso!');
       resetForm();
     },
-    onError: () => {
-      FeedbackService.error('Erro ao publicar trend');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao publicar trend');
     }
   });
 
-  const handleVideoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Validar tipo de arquivo
-      if (!file.type.startsWith('video/')) {
-        FeedbackService.error('Por favor, selecione um arquivo de vídeo válido');
-        return;
-      }
-
-      // Validar tamanho (máx 100MB)
-      if (file.size > 100 * 1024 * 1024) {
-        FeedbackService.error('O vídeo deve ter no máximo 100MB');
-        return;
-      }
-
-      setSelectedVideo(file);
-      
-      // Criar preview
-      const url = URL.createObjectURL(file);
-      setVideoPreview(url);
+  const deleteTrendMutation = useMutation({
+    mutationFn: TrendsService.deleteTrend,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trends'] });
+      queryClient.invalidateQueries({ queryKey: ['trend-stats'] });
+      FeedbackService.success('Trend excluído');
+    },
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao excluir trend');
     }
+  });
+
+  const pickVideo = (file?: File) => {
+    if (!file) return;
+    // mesmos formatos aceitos pela API
+    if (!ACCEPTED_VIDEO_TYPES.includes(file.type)) {
+      FeedbackService.error('Formato não suportado. Use MP4, WEBM ou MOV');
+      return;
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      FeedbackService.error('O vídeo deve ter no máximo 100MB');
+      return;
+    }
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
+    setSelectedVideo(file);
+    setVideoDuration(0);
+    setVideoPreview(URL.createObjectURL(file));
+  };
+
+  const handleVideoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    pickVideo(event.target.files?.[0]);
   };
 
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
-    const file = event.dataTransfer.files[0];
-    if (file && file.type.startsWith('video/')) {
-      setSelectedVideo(file);
-      const url = URL.createObjectURL(file);
-      setVideoPreview(url);
-    }
+    pickVideo(event.dataTransfer.files[0]);
+  };
+
+  const handleDeleteTrend = (trendId: string, title: string) => {
+    if (window.confirm(`Excluir o trend "${title}"?`)) deleteTrendMutation.mutate(trendId);
+  };
+
+  const shareTrend = (videoUrl: string) => {
+    navigator.clipboard.writeText(videoUrl);
+    FeedbackService.success('Link do vídeo copiado!');
   };
 
   const handleDragOver = (event: React.DragEvent) => {
@@ -142,13 +162,15 @@ export function TrendsPage() {
     uploadTrendMutation.mutate({
       video: selectedVideo,
       ...trendData,
-      lojaId: user?.lojaId || '1'
+      duration: Number.isFinite(videoDuration) ? videoDuration : 0
     });
   };
 
   const resetForm = () => {
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
     setSelectedVideo(null);
     setVideoPreview('');
+    setVideoDuration(0);
     setTrendData({
       title: '',
       description: '',
@@ -214,7 +236,7 @@ export function TrendsPage() {
                 Crie vídeos virais para promover seus produtos
               </p>
             </div>
-            
+
             <Button onClick={() => setUploadModalOpen(true)} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
               <Plus className="h-4 w-4 mr-2" />
               Novo Trend
@@ -309,30 +331,38 @@ export function TrendsPage() {
                   {trends.map((trend) => (
                     <Card key={trend.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                       <div className="relative">
-                        <video 
-                          className="w-full h-48 object-cover"
-                          poster={trend.thumbnail}
-                        >
-                          <source src={trend.videoUrl} type="video/mp4" />
-                        </video>
+                        <video
+                          className="w-full h-48 object-cover bg-black"
+                          src={trend.videoUrl}
+                          preload="metadata"
+                          muted
+                        />
                         <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                          <Button size="icon" className="rounded-full bg-white/20 backdrop-blur-sm">
+                          <Button
+                            size="icon"
+                            className="rounded-full bg-white/20 backdrop-blur-sm"
+                            onClick={() => window.open(trend.videoUrl, '_blank')}
+                            aria-label="Assistir vídeo"
+                          >
                             <Play className="h-6 w-6 text-white" />
                           </Button>
                         </div>
                         <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
                           {formatDuration(trend.duration)}
                         </div>
-                        <Badge className="absolute top-2 left-2" variant={trend.status === 'published' ? 'success' : 'warning'}>
-                          {trend.status === 'published' ? 'Publicado' : 'Processando'}
+                        <Badge className="absolute top-2 left-2" variant={STATUS_BADGE[trend.status].variant}>
+                          {STATUS_BADGE[trend.status].label}
                         </Badge>
                       </div>
-                      
+
                       <CardContent className="p-4">
                         <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">
                           {trend.title}
                         </h3>
-                        
+                        {trend.moderationReason && (
+                          <p className="text-xs text-red-600 mb-2">Moderação: {trend.moderationReason}</p>
+                        )}
+
                         <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
                           <div className="flex items-center gap-1">
                             <Eye className="h-4 w-4" />
@@ -347,17 +377,24 @@ export function TrendsPage() {
                             {trend.comments}
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {trend.publishedAt}
+                            {(trend.publishedAt ?? trend.createdAt).toLocaleDateString('pt-BR')}
                           </span>
                           <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <BarChart3 className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => shareTrend(trend.videoUrl)} aria-label="Copiar link">
                               <Share2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-600"
+                              onClick={() => handleDeleteTrend(trend.id, trend.title)}
+                              disabled={deleteTrendMutation.isPending}
+                              aria-label="Excluir trend"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
@@ -404,6 +441,9 @@ export function TrendsPage() {
                       <p className="text-sm text-gray-600">
                         Vendas atribuídas aos trends
                       </p>
+                      <p className="text-xs text-gray-500 mt-2">
+                        A atribuição de vendas aos vídeos ainda não está disponível.
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -420,7 +460,7 @@ export function TrendsPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Veja os trends que estão fazendo sucesso e inspire-se para criar o seu!
+                    O ranking de trends da plataforma ainda não está disponível.
                   </p>
                 </CardContent>
               </Card>
@@ -456,12 +496,12 @@ export function TrendsPage() {
                         Arraste um vídeo aqui ou clique para selecionar
                       </p>
                       <p className="text-sm text-gray-500">
-                        MP4, MOV, AVI (máx. 100MB, até 60 segundos)
+                        MP4, WEBM ou MOV (máx. 100MB)
                       </p>
                       <input
                         ref={fileInputRef}
                         type="file"
-                        accept="video/*"
+                        accept={ACCEPTED_VIDEO_TYPES.join(',')}
                         onChange={handleVideoSelect}
                         className="hidden"
                       />
@@ -473,14 +513,17 @@ export function TrendsPage() {
                         src={videoPreview}
                         className="w-full h-64 object-cover rounded-lg"
                         controls
+                        onLoadedMetadata={(e) => setVideoDuration(e.currentTarget.duration)}
                       />
                       <Button
                         variant="destructive"
                         size="icon"
                         className="absolute top-2 right-2"
                         onClick={() => {
+                          if (videoPreview) URL.revokeObjectURL(videoPreview);
                           setSelectedVideo(null);
                           setVideoPreview('');
+                          setVideoDuration(0);
                         }}
                       >
                         <X className="h-4 w-4" />
@@ -523,8 +566,8 @@ export function TrendsPage() {
                 {/* Category */}
                 <div>
                   <Label>Categoria</Label>
-                  <Select 
-                    value={trendData.category} 
+                  <Select
+                    value={trendData.category}
                     onValueChange={(value) => setTrendData(prev => ({ ...prev, category: value }))}
                   >
                     <SelectTrigger>
@@ -543,8 +586,8 @@ export function TrendsPage() {
                 {/* Products */}
                 <div>
                   <Label>Produtos em Destaque</Label>
-                  <Select 
-                    value={trendData.productIds[0] || ''} 
+                  <Select
+                    value={trendData.productIds[0] || ''}
                     onValueChange={(value) => setTrendData(prev => ({ ...prev, productIds: value ? [value] : [] }))}
                   >
                     <SelectTrigger>
@@ -579,7 +622,7 @@ export function TrendsPage() {
                 <Button variant="outline" onClick={resetForm}>
                   Cancelar
                 </Button>
-                <Button 
+                <Button
                   onClick={handleSubmit}
                   disabled={uploadTrendMutation.isPending || !selectedVideo || !trendData.title}
                   className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"

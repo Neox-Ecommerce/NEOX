@@ -11,6 +11,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { FeedbackService } from '@/services/FeedbackService';
+
+const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+const MAX_BYTES = 10 * 1024 * 1024;
 
 interface DocumentUploadModalProps {
   open: boolean;
@@ -25,7 +29,11 @@ export function DocumentUploadModal({ open, onOpenChange, onSubmit }: DocumentUp
   const [dragActive, setDragActive] = useState(false);
 
   const handleFileSelect = (file: File) => {
-    if (file && (file.type === 'application/pdf' || file.type.startsWith('image/'))) {
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      FeedbackService.error('Envie um PDF ou imagem JPG, PNG ou WEBP');
+    } else if (file.size > MAX_BYTES) {
+      FeedbackService.error('O arquivo deve ter no máximo 10MB');
+    } else {
       setSelectedFile(file);
     }
   };
@@ -60,8 +68,8 @@ export function DocumentUploadModal({ open, onOpenChange, onSubmit }: DocumentUp
       setSelectedFile(null);
       setDescription('');
       onOpenChange(false);
-    } catch (error) {
-      console.error('Erro ao enviar documento:', error);
+    } catch {
+      // o erro já foi exibido por quem chamou; mantém o modal aberto para tentar de novo
     } finally {
       setIsUploading(false);
     }
@@ -82,7 +90,8 @@ export function DocumentUploadModal({ open, onOpenChange, onSubmit }: DocumentUp
         <DialogHeader>
           <DialogTitle>Enviar Documento Comprobatório</DialogTitle>
           <DialogDescription>
-            Envie um documento que comprove a validade do seu CNPJ (Cartão CNPJ, Contrato Social, etc.)
+            Envie um documento que comprove a validade do seu CNPJ (Cartão CNPJ, Contrato Social, etc.).
+            Ele será analisado pela equipe NEOX.
           </DialogDescription>
         </DialogHeader>
 
@@ -121,7 +130,7 @@ export function DocumentUploadModal({ open, onOpenChange, onSubmit }: DocumentUp
               >
                 <input
                   type="file"
-                  accept=".pdf,image/*"
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) handleFileSelect(file);
@@ -135,7 +144,7 @@ export function DocumentUploadModal({ open, onOpenChange, onSubmit }: DocumentUp
                       Arraste um arquivo aqui ou clique para selecionar
                     </p>
                     <p className="text-xs text-gray-500">
-                      PDF ou imagem (máx. 10MB)
+                      PDF, JPG, PNG ou WEBP (máx. 10MB)
                     </p>
                   </div>
                 </div>

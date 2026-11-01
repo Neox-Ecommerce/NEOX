@@ -1,36 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  CreditCard, 
-  Search, 
-  Filter, 
-  Download, 
-  DollarSign, 
-  Wallet, 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  Calendar, 
-  Ban as Bank, 
-  Plus, 
-  Check, 
-  X, 
-  AlertTriangle, 
-  Clock, 
-  FileText, 
-  BarChart3, 
-  PieChart, 
-  Zap, 
-  Edit,
-  Send,
-  Eye,
-  EyeOff,
-  Copy
+import {
+  CreditCard,
+  Search,
+  Filter,
+  DollarSign,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownRight,
+  Calendar,
+  Landmark as Bank,
+  Plus,
+  AlertTriangle,
+  FileText,
+  Send
 } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
 import { RoleGuard } from '@/components/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -51,10 +40,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { FinancialService } from '@/services/FinancialService';
+import { FinancialService, type Payment } from '@/services/FinancialService';
+import { ApiError } from '@/lib/api';
 import { FeedbackService } from '@/services/FeedbackService';
-import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/utils';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -65,13 +53,13 @@ export function FinanceiroPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
-  const [paymentData, setPaymentData] = useState({
+  const emptyPayment = {
     orderId: '',
     amount: '',
-    method: 'credit_card' as 'credit_card' | 'debit_card' | 'pix' | 'boleto' | 'transfer',
-    gateway: '',
-    status: 'pending' as 'pending' | 'processing' | 'approved' | 'rejected' | 'refunded'
-  });
+    method: 'pix' as Payment['method'],
+    status: 'approved' as 'pending' | 'approved'
+  };
+  const [paymentData, setPaymentData] = useState(emptyPayment);
   const [payoutAmount, setPayoutAmount] = useState('');
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>('');
   const [bankAccountData, setBankAccountData] = useState({
@@ -84,10 +72,8 @@ export function FinanceiroPage() {
     isDefault: true,
     isActive: true
   });
-  const [showSecret, setShowSecret] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('payments');
 
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
@@ -115,47 +101,50 @@ export function FinanceiroPage() {
   };
 
   const { data: payments = [], isLoading: paymentsLoading } = useQuery({
-    queryKey: ['payments', user?.lojaId],
-    queryFn: () => FinancialService.getPayments(user?.lojaId || '1')
+    queryKey: ['payments'],
+    queryFn: FinancialService.getPayments
   });
 
   const { data: payouts = [], isLoading: payoutsLoading } = useQuery({
-    queryKey: ['payouts', user?.lojaId],
-    queryFn: () => FinancialService.getPayouts(user?.lojaId || '1')
+    queryKey: ['payouts'],
+    queryFn: FinancialService.getPayouts
   });
 
   const { data: bankAccounts = [], isLoading: bankAccountsLoading } = useQuery({
-    queryKey: ['bank-accounts', user?.lojaId],
-    queryFn: () => FinancialService.getBankAccounts(user?.lojaId || '1')
+    queryKey: ['bank-accounts'],
+    queryFn: FinancialService.getBankAccounts
   });
 
   const { data: financialStats } = useQuery({
-    queryKey: ['financial-stats', user?.lojaId],
-    queryFn: () => FinancialService.getFinancialStats(user?.lojaId || '1')
+    queryKey: ['financial-stats'],
+    queryFn: FinancialService.getFinancialStats
   });
+
+  const { data: payableOrders = [] } = useQuery({
+    queryKey: ['payable-orders'],
+    queryFn: FinancialService.getPayableOrders,
+    enabled: paymentModalOpen
+  });
+
+  const errorText = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
 
   const createPaymentMutation = useMutation({
     mutationFn: FinancialService.createPayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['financial-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['payable-orders'] });
       FeedbackService.success('Pagamento registrado com sucesso!');
       setPaymentModalOpen(false);
-      setPaymentData({
-        orderId: '',
-        amount: '',
-        method: 'credit_card',
-        gateway: '',
-        status: 'pending'
-      });
+      setPaymentData(emptyPayment);
     },
-    onError: () => {
-      FeedbackService.error('Erro ao registrar pagamento');
+    onError: (error) => {
+      FeedbackService.error(errorText(error, 'Erro ao registrar pagamento'));
     }
   });
 
   const createPayoutMutation = useMutation({
-    mutationFn: ({ amount, bankAccountId }: { amount: number; bankAccountId: string }) => 
+    mutationFn: ({ amount, bankAccountId }: { amount: number; bankAccountId: string }) =>
       FinancialService.createPayout(amount, bankAccountId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payouts'] });
@@ -165,8 +154,8 @@ export function FinanceiroPage() {
       setPayoutAmount('');
       setSelectedBankAccount('');
     },
-    onError: () => {
-      FeedbackService.error('Erro ao solicitar repasse');
+    onError: (error) => {
+      FeedbackService.error(errorText(error, 'Erro ao solicitar repasse'));
     }
   });
 
@@ -187,13 +176,13 @@ export function FinanceiroPage() {
         isActive: true
       });
     },
-    onError: () => {
-      FeedbackService.error('Erro ao adicionar conta bancária');
+    onError: (error) => {
+      FeedbackService.error(errorText(error, 'Erro ao adicionar conta bancária'));
     }
   });
 
   const handleCreatePayment = () => {
-    if (!paymentData.orderId || !paymentData.amount || !paymentData.gateway) {
+    if (!paymentData.orderId || !paymentData.amount) {
       FeedbackService.error('Preencha todos os campos obrigatórios');
       return;
     }
@@ -208,7 +197,6 @@ export function FinanceiroPage() {
       orderId: paymentData.orderId,
       amount,
       method: paymentData.method,
-      gateway: paymentData.gateway,
       status: paymentData.status
     });
   };
@@ -246,18 +234,18 @@ export function FinanceiroPage() {
   };
 
   const filteredPayments = payments.filter(payment => {
-    const matchesSearch = searchQuery === '' || 
-      payment.orderId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch = searchQuery === '' ||
+      (payment.orderCode ?? '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       payment.transactionId?.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesStatus = statusFilter === 'all' || payment.status === statusFilter;
-    
+
     const matchesDate = dateFilter === 'all' || (() => {
       const paymentDate = new Date(payment.createdAt);
       const today = new Date();
       const diffTime = today.getTime() - paymentDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
+
       switch (dateFilter) {
         case 'today': return diffDays <= 1;
         case 'week': return diffDays <= 7;
@@ -265,7 +253,7 @@ export function FinanceiroPage() {
         default: return true;
       }
     })();
-    
+
     return matchesSearch && matchesStatus && matchesDate;
   });
 
@@ -300,11 +288,6 @@ export function FinanceiroPage() {
     }
   };
 
-  const copyCouponCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    FeedbackService.success('Código copiado para a área de transferência!');
-  };
-
   const banks = FinancialService.getBanks();
 
   if (paymentsLoading || payoutsLoading || bankAccountsLoading) {
@@ -333,7 +316,7 @@ export function FinanceiroPage() {
                 Gerencie pagamentos, repasses e finanças da sua loja
               </p>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <Button variant="outline" onClick={() => setPaymentModalOpen(true)}>
                 <CreditCard className="h-4 w-4 mr-2" />
@@ -424,7 +407,7 @@ export function FinanceiroPage() {
                     className="pl-10"
                   />
                 </div>
-                
+
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-48">
                     <Filter className="h-4 w-4 mr-2" />
@@ -480,13 +463,20 @@ export function FinanceiroPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
+                      {filteredPayments.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            {payments.length === 0 ? 'Nenhum pagamento recebido ainda.' : 'Nenhum pagamento encontrado com esses filtros.'}
+                          </TableCell>
+                        </TableRow>
+                      )}
                       {filteredPayments.map((payment) => {
                         const PaymentIcon = getPaymentMethodIcon(payment.method);
                         return (
                           <TableRow key={payment.id}>
                             <TableCell>
                               <div className="font-medium text-gray-900 dark:text-white">
-                                {payment.orderId}
+                                {payment.orderCode ? `Pedido #${payment.orderCode.replace(/^#/, '')}` : '-'}
                               </div>
                               {payment.transactionId && (
                                 <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -506,7 +496,7 @@ export function FinanceiroPage() {
                                 </span>
                               </div>
                               <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {payment.gateway}
+                                {payment.gateway === 'manual' ? 'Registro manual' : payment.gateway}
                               </div>
                             </TableCell>
                             <TableCell className="font-medium">
@@ -561,10 +551,17 @@ export function FinanceiroPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
+                      {payouts.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                            Nenhum repasse solicitado ainda.
+                          </TableCell>
+                        </TableRow>
+                      )}
                       {payouts.map((payout) => (
                         <TableRow key={payout.id}>
                           <TableCell className="font-mono text-xs">
-                            {payout.id}
+                            {payout.id.slice(0, 8)}
                           </TableCell>
                           <TableCell className="font-medium">
                             {formatCurrency(payout.amount)}
@@ -590,7 +587,7 @@ export function FinanceiroPage() {
                             {new Date(payout.scheduledDate).toLocaleDateString('pt-BR')}
                           </TableCell>
                           <TableCell>
-                            {payout.processedDate 
+                            {payout.processedDate
                               ? new Date(payout.processedDate).toLocaleDateString('pt-BR')
                               : '-'
                             }
@@ -615,6 +612,11 @@ export function FinanceiroPage() {
               </div>
 
               {/* Bank Accounts */}
+              {bankAccounts.length === 0 && (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  Nenhuma conta bancária cadastrada. Cadastre uma conta para solicitar repasses.
+                </p>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {bankAccounts.map((account) => (
                   <Card key={account.id} className={account.isDefault ? 'border-primary' : ''}>
@@ -632,7 +634,7 @@ export function FinanceiroPage() {
                               </Badge>
                             )}
                           </div>
-                          
+
                           <div className="space-y-1 text-sm">
                             <div>
                               <span className="text-gray-500">Agência:</span>{' '}
@@ -649,13 +651,13 @@ export function FinanceiroPage() {
                               </span>
                             </div>
                           </div>
-                          
+
                           <div className="text-sm">
                             <div className="font-medium">{account.holderName}</div>
                             <div className="text-gray-500">{account.holderDocument}</div>
                           </div>
                         </div>
-                        
+
                         <Badge variant={account.isActive ? 'success' : 'secondary'}>
                           {account.isActive ? 'Ativa' : 'Inativa'}
                         </Badge>
@@ -673,19 +675,31 @@ export function FinanceiroPage() {
               <DialogHeader>
                 <DialogTitle>Registrar Pagamento</DialogTitle>
                 <DialogDescription>
-                  Registre um novo pagamento manualmente
+                  Registre um pagamento recebido fora da plataforma (ex.: dinheiro na entrega). Sem taxas.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="order-id">ID do Pedido *</Label>
-                  <Input
-                    id="order-id"
+                  <Label htmlFor="order-id">Pedido *</Label>
+                  <Select
                     value={paymentData.orderId}
-                    onChange={(e) => setPaymentData(prev => ({ ...prev, orderId: e.target.value }))}
-                    placeholder="Ex: #001234"
-                  />
+                    onValueChange={(value) => {
+                      const order = payableOrders.find((o) => o.id === value);
+                      setPaymentData(prev => ({ ...prev, orderId: value, amount: order ? String(order.total) : prev.amount }));
+                    }}
+                  >
+                    <SelectTrigger id="order-id">
+                      <SelectValue placeholder={payableOrders.length ? 'Selecione o pedido' : 'Nenhum pedido aguardando pagamento'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {payableOrders.map((order) => (
+                        <SelectItem key={order.id} value={order.id}>
+                          Pedido #{order.code.replace(/^#/, '')} — {formatCurrency(order.total)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -707,9 +721,9 @@ export function FinanceiroPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="payment-method">Método de Pagamento *</Label>
-                  <Select 
-                    value={paymentData.method} 
-                    onValueChange={(value) => setPaymentData(prev => ({ ...prev, method: value as any }))}
+                  <Select
+                    value={paymentData.method}
+                    onValueChange={(value) => setPaymentData(prev => ({ ...prev, method: value as typeof prev.method }))}
                   >
                     <SelectTrigger id="payment-method">
                       <SelectValue placeholder="Selecione o método" />
@@ -725,39 +739,17 @@ export function FinanceiroPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="payment-gateway">Gateway de Pagamento *</Label>
-                  <Select 
-                    value={paymentData.gateway} 
-                    onValueChange={(value) => setPaymentData(prev => ({ ...prev, gateway: value }))}
-                  >
-                    <SelectTrigger id="payment-gateway">
-                      <SelectValue placeholder="Selecione o gateway" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Stripe">Stripe</SelectItem>
-                      <SelectItem value="PagSeguro">PagSeguro</SelectItem>
-                      <SelectItem value="Mercado Pago">Mercado Pago</SelectItem>
-                      <SelectItem value="PayPal">PayPal</SelectItem>
-                      <SelectItem value="Manual">Pagamento Manual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
                   <Label htmlFor="payment-status">Status do Pagamento *</Label>
-                  <Select 
-                    value={paymentData.status} 
-                    onValueChange={(value) => setPaymentData(prev => ({ ...prev, status: value as any }))}
+                  <Select
+                    value={paymentData.status}
+                    onValueChange={(value) => setPaymentData(prev => ({ ...prev, status: value as 'pending' | 'approved' }))}
                   >
                     <SelectTrigger id="payment-status">
                       <SelectValue placeholder="Selecione o status" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="approved">Recebido (marca o pedido como pago)</SelectItem>
                       <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="processing">Processando</SelectItem>
-                      <SelectItem value="approved">Aprovado</SelectItem>
-                      <SelectItem value="rejected">Rejeitado</SelectItem>
-                      <SelectItem value="refunded">Reembolsado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -767,7 +759,7 @@ export function FinanceiroPage() {
                 <Button variant="outline" onClick={() => setPaymentModalOpen(false)}>
                   Cancelar
                 </Button>
-                <Button 
+                <Button
                   onClick={handleCreatePayment}
                   disabled={createPaymentMutation.isPending}
                 >
@@ -810,15 +802,18 @@ export function FinanceiroPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="bank-account">Conta Bancária *</Label>
-                  <Select 
-                    value={selectedBankAccount} 
+                  {bankAccounts.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Cadastre uma conta na aba Contas Bancárias.</p>
+                  )}
+                  <Select
+                    value={selectedBankAccount}
                     onValueChange={setSelectedBankAccount}
                   >
                     <SelectTrigger id="bank-account">
                       <SelectValue placeholder="Selecione uma conta bancária" />
                     </SelectTrigger>
                     <SelectContent>
-                      {bankAccounts.map((account) => (
+                      {bankAccounts.filter((account) => account.isActive).map((account) => (
                         <SelectItem key={account.id} value={account.id}>
                           <div className="flex items-center gap-2">
                             <Bank className="h-4 w-4" />
@@ -843,9 +838,9 @@ export function FinanceiroPage() {
                         Informações importantes
                       </p>
                       <ul className="text-sm text-yellow-700 mt-1 space-y-1 list-disc list-inside">
-                        <li>O repasse será processado em até 1 dia útil</li>
-                        <li>Taxa de 0,2% sobre o valor do repasse</li>
-                        <li>Valor mínimo para repasse: R$ 50,00</li>
+                        <li>A transferência é feita pela equipe NEOX após a solicitação (previsão: 1 dia útil)</li>
+                        <li>Não há taxa de repasse</li>
+                        <li>O valor não pode passar do saldo disponível</li>
                       </ul>
                     </div>
                   </div>
@@ -856,7 +851,7 @@ export function FinanceiroPage() {
                 <Button variant="outline" onClick={() => setPayoutModalOpen(false)}>
                   Cancelar
                 </Button>
-                <Button 
+                <Button
                   onClick={handleCreatePayout}
                   disabled={createPayoutMutation.isPending}
                 >
@@ -879,8 +874,8 @@ export function FinanceiroPage() {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="bank">Banco *</Label>
-                  <Select 
-                    value={bankAccountData.bank} 
+                  <Select
+                    value={bankAccountData.bank}
                     onValueChange={(value) => setBankAccountData(prev => ({ ...prev, bank: value }))}
                   >
                     <SelectTrigger id="bank">
@@ -903,7 +898,7 @@ export function FinanceiroPage() {
                       id="agency"
                       value={bankAccountData.agency}
                       onChange={(e) => setBankAccountData(prev => ({ ...prev, agency: e.target.value }))}
-                      placeholder="Ex: 1234-5"
+                      placeholder="Ex: 1234 ou 1234-5"
                     />
                   </div>
 
@@ -920,8 +915,8 @@ export function FinanceiroPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="account-type">Tipo de Conta *</Label>
-                  <Select 
-                    value={bankAccountData.accountType} 
+                  <Select
+                    value={bankAccountData.accountType}
                     onValueChange={(value) => setBankAccountData(prev => ({ ...prev, accountType: value as 'checking' | 'savings' }))}
                   >
                     <SelectTrigger id="account-type">
@@ -972,7 +967,7 @@ export function FinanceiroPage() {
                 <Button variant="outline" onClick={() => setBankAccountModalOpen(false)}>
                   Cancelar
                 </Button>
-                <Button 
+                <Button
                   onClick={handleAddBankAccount}
                   disabled={addBankAccountMutation.isPending}
                 >

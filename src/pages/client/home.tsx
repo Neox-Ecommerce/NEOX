@@ -1,8 +1,11 @@
-import React from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, Zap, Globe, Search, TrendingUp, Users, Check, Star, ArrowRight, Store, Package, Headphones, Instagram, Facebook } from 'lucide-react';
+import { ShoppingBag, Zap, Globe, Search, TrendingUp, Users, Check, Star, Store, Package, Headphones, Instagram, Facebook } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { HelpService } from '@/services/HelpService';
+import { FeedbackService } from '@/services/FeedbackService';
 
 export function ClientHomePage() {
   return (
@@ -349,187 +352,7 @@ export function ClientHomePage() {
         </div>
       </section>
 
-      {/* Contact Section */}
-      <section id="contato" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
-              Entre em <span className="text-green-600">Contato</span>
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Tem dúvidas ou precisa de ajuda? Nossa equipe está pronta para atendê-lo
-            </p>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-12">
-            {/* Contact Form */}
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h3 className="text-2xl font-bold text-gray-800 mb-6">Envie sua mensagem</h3>
-              <form className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-2">
-                      Nome completo
-                    </label>
-                    <Input
-                      type="text"
-                      id="nome"
-                      name="nome"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                      placeholder="Seu nome"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                      E-mail
-                    </label>
-                    <Input
-                      type="email"
-                      id="email"
-                      name="email"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                      placeholder="seu@email.com"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="telefone" className="block text-sm font-medium text-gray-700 mb-2">
-                    Telefone
-                  </label>
-                  <Input
-                    type="tel"
-                    id="telefone"
-                    name="telefone"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                    placeholder="(11) 99999-9999"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="assunto" className="block text-sm font-medium text-gray-700 mb-2">
-                    Assunto
-                  </label>
-                  <select
-                    id="assunto"
-                    name="assunto"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                  >
-                    <option value="">Selecione um assunto</option>
-                    <option value="duvidas">Dúvidas sobre planos</option>
-                    <option value="suporte">Suporte técnico</option>
-                    <option value="vendas">Vendas</option>
-                    <option value="parceria">Parcerias</option>
-                    <option value="outros">Outros</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="mensagem" className="block text-sm font-medium text-gray-700 mb-2">
-                    Mensagem
-                  </label>
-                  <textarea
-                    id="mensagem"
-                    name="mensagem"
-                    rows={5}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors resize-none"
-                    placeholder="Descreva sua dúvida ou necessidade..."
-                  ></textarea>
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
-                >
-                  Enviar Mensagem
-                </Button>
-              </form>
-            </div>
-
-            {/* Contact Information */}
-            <div className="space-y-8">
-              <div className="bg-white rounded-2xl shadow-lg p-8">
-                <h3 className="text-2xl font-bold text-gray-800 mb-6">Informações de contato</h3>
-                <div className="space-y-6">
-                  <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-800 mb-1">E-mail</h4>
-                      <p className="text-gray-600">contato@neoxstore.com.br</p>
-                      <p className="text-gray-600">suporte@neoxstore.com.br</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-800 mb-1">Telefone</h4>
-                      <p className="text-gray-600">(11) 3000-0000</p>
-                      <p className="text-gray-600">(11) 99999-9999</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-800 mb-1">Endereço</h4>
-                      <p className="text-gray-600">
-                        Av. Paulista, 1000 - Sala 1001<br />
-                        Bela Vista, São Paulo - SP<br />
-                        CEP: 01310-100
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-800 mb-1">Horário de atendimento</h4>
-                      <p className="text-gray-600">Segunda a Sexta: 9h às 18h</p>
-                      <p className="text-gray-600">Sábado: 9h às 12h</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* FAQ Quick Links */}
-              <div className="bg-white rounded-2xl shadow-lg p-8">
-                <h3 className="text-2xl font-bold text-gray-800 mb-6">Perguntas frequentes</h3>
-                <div className="space-y-4">
-                  <div className="border-l-4 border-green-500 pl-4">
-                    <h4 className="font-semibold text-gray-800 mb-1">Como criar minha primeira loja?</h4>
-                    <p className="text-gray-600 text-sm">É muito simples! Basta se cadastrar e seguir nosso guia passo a passo.</p>
-                  </div>
-                  <div className="border-l-4 border-green-500 pl-4">
-                    <h4 className="font-semibold text-gray-800 mb-1">Posso mudar de plano a qualquer momento?</h4>
-                    <p className="text-gray-600 text-sm">Sim, você pode fazer upgrade ou downgrade do seu plano quando quiser.</p>
-                  </div>
-                  <div className="border-l-4 border-green-500 pl-4">
-                    <h4 className="font-semibold text-gray-800 mb-1">Há taxa de setup ou instalação?</h4>
-                    <p className="text-gray-600 text-sm">Não cobramos nenhuma taxa adicional. Apenas o valor mensal do plano escolhido.</p>
-                  </div>
-                </div>
-                <div className="mt-6">
-                  <Button className="text-green-600 hover:text-green-700 font-semibold flex items-center space-x-2 transition-colors" variant="ghost">
-                    <Headphones className="w-5 h-5" />
-                    <span>Ver todas as perguntas</span>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <ContactSection />
 
       {/* CTA Section */}
       <section className="py-20 bg-green-600">
@@ -608,5 +431,170 @@ export function ClientHomePage() {
         </div>
       </footer>
     </div>
+  );
+}
+
+function ContactSection() {
+  const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
+  const [showAllFaq, setShowAllFaq] = useState(false);
+  const contactInfo = HelpService.getContactInfo();
+  const { data: faq = [] } = useQuery({ queryKey: ['faq', 'public'], queryFn: () => HelpService.getFAQ() });
+
+  const contactMutation = useMutation({
+    mutationFn: HelpService.sendContactMessage,
+    onSuccess: (res) => {
+      FeedbackService.success(res.message);
+      setForm({ name: '', email: '', phone: '', subject: '', message: '' });
+    },
+    onError: (error: Error) => FeedbackService.error(error.message || 'Erro ao enviar mensagem'),
+  });
+
+  const set = (field: keyof typeof form) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.email || !form.subject || form.message.trim().length < 10) {
+      FeedbackService.error('Preencha nome, e-mail, assunto e uma mensagem com ao menos 10 caracteres');
+      return;
+    }
+    contactMutation.mutate({ ...form, phone: form.phone || undefined });
+  };
+
+  const inputClass = 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors';
+
+  return (
+      <section id="contato" className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4">
+              Entre em <span className="text-green-600">Contato</span>
+            </h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Tem dúvidas ou precisa de ajuda? Nossa equipe está pronta para atendê-lo
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-12">
+            {/* Contact Form */}
+            <div className="bg-white rounded-2xl shadow-lg p-8">
+              <h3 className="text-2xl font-bold text-gray-800 mb-6">Envie sua mensagem</h3>
+              <form className="space-y-6" onSubmit={handleSubmit}>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-2">
+                      Nome completo
+                    </label>
+                    <Input type="text" id="nome" name="nome" className={inputClass} placeholder="Seu nome"
+                      value={form.name} onChange={set('name')} required />
+                  </div>
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                      E-mail
+                    </label>
+                    <Input type="email" id="email" name="email" className={inputClass} placeholder="seu@email.com"
+                      value={form.email} onChange={set('email')} required />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="telefone" className="block text-sm font-medium text-gray-700 mb-2">
+                    Telefone (opcional)
+                  </label>
+                  <Input type="tel" id="telefone" name="telefone" className={inputClass} placeholder="(11) 99999-9999"
+                    value={form.phone} onChange={set('phone')} />
+                </div>
+                <div>
+                  <label htmlFor="assunto" className="block text-sm font-medium text-gray-700 mb-2">
+                    Assunto
+                  </label>
+                  <select id="assunto" name="assunto" className={inputClass} value={form.subject} onChange={set('subject')} required>
+                    <option value="">Selecione um assunto</option>
+                    <option value="Quero vender na NEOX">Quero vender na NEOX</option>
+                    <option value="Dúvida sobre um pedido">Dúvida sobre um pedido</option>
+                    <option value="Suporte técnico">Suporte técnico</option>
+                    <option value="Parcerias">Parcerias</option>
+                    <option value="Outros">Outros</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="mensagem" className="block text-sm font-medium text-gray-700 mb-2">
+                    Mensagem
+                  </label>
+                  <textarea id="mensagem" name="mensagem" rows={5} className={`${inputClass} resize-none`}
+                    placeholder="Descreva sua dúvida ou necessidade..." value={form.message} onChange={set('message')} required />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={contactMutation.isPending}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-lg font-semibold transition-colors"
+                >
+                  {contactMutation.isPending ? 'Enviando...' : 'Enviar Mensagem'}
+                </Button>
+              </form>
+            </div>
+
+            {/* Contact Information */}
+            <div className="space-y-8">
+              <div className="bg-white rounded-2xl shadow-lg p-8">
+                <h3 className="text-2xl font-bold text-gray-800 mb-6">Informações de contato</h3>
+                <div className="space-y-6">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-800 mb-1">E-mail</h4>
+                      <a href={`mailto:${contactInfo.email}`} className="text-gray-600 hover:text-green-600">{contactInfo.email}</a>
+                    </div>
+                  </div>
+                  <div className="flex items-start space-x-4">
+                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-800 mb-1">Horário de atendimento</h4>
+                      {contactInfo.businessHours.map((h) => (
+                        <p key={h.days} className="text-gray-600">{h.days}: {h.hours}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* FAQ */}
+              {faq.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-lg p-8">
+                  <h3 className="text-2xl font-bold text-gray-800 mb-6">Perguntas frequentes</h3>
+                  <div className="space-y-4">
+                    {(showAllFaq ? faq : faq.slice(0, 3)).map((item) => (
+                      <details key={item.id} className="border-l-4 border-green-500 pl-4 group">
+                        <summary className="font-semibold text-gray-800 cursor-pointer list-none">{item.question}</summary>
+                        <p className="text-gray-600 text-sm mt-1">{item.answer}</p>
+                      </details>
+                    ))}
+                  </div>
+                  {faq.length > 3 && (
+                    <div className="mt-6">
+                      <Button
+                        type="button"
+                        className="text-green-600 hover:text-green-700 font-semibold flex items-center space-x-2 transition-colors"
+                        variant="ghost"
+                        onClick={() => setShowAllFaq(!showAllFaq)}
+                      >
+                        <Headphones className="w-5 h-5" />
+                        <span>{showAllFaq ? 'Ver menos' : 'Ver todas as perguntas'}</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
   );
 }

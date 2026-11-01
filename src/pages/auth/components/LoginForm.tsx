@@ -4,11 +4,7 @@ import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { FeedbackService } from '@/services/FeedbackService';
 
-interface LoginFormProps {
-  onLoginSuccess?: (userRoles: any) => void;
-}
-
-export function LoginForm({ onLoginSuccess }: LoginFormProps) {
+export function LoginForm() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -61,8 +57,8 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
           navigate('/');
         }
         
-      } catch (error: any) {
-        FeedbackService.error(error.message || 'Credenciais inválidas');
+      } catch (error) {
+        FeedbackService.error(error instanceof Error ? error.message : 'Credenciais inválidas');
       } finally {
         setIsLoading(false);
       }
@@ -84,16 +80,6 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
         <p className="text-sm text-gray-500">
           Entre com sua conta única e escolha seu papel
         </p>
-      </div>
-
-      {/* Demo Credentials Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-        <p className="text-xs font-medium text-blue-800 mb-1">Credenciais de demonstração:</p>
-        <div className="text-xs text-blue-700 space-y-1">
-          <p><strong>Admin:</strong> admin@neoxstore.com / 123456</p>
-          <p><strong>Empreendedor:</strong> lojista@neoxstore.com / 123456</p>
-          <p><strong>Cliente:</strong> cliente@neoxstore.com / 123456</p>
-        </div>
       </div>
 
       {/* Email Field */}

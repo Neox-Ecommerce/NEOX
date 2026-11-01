@@ -1,4 +1,8 @@
-interface Store {
+import { api, withDates } from '@/lib/api';
+
+export type StoreStatus = 'PENDENTE' | 'APROVADA' | 'REJEITADA' | 'SUSPENSA';
+
+export interface Store {
   id: string;
   nomeFantasia: string;
   razaoSocial: string;
@@ -24,57 +28,51 @@ interface Store {
     website?: string;
   };
   tiposEntrega: string[];
+  status: StoreStatus;
+  statusReason?: string;
 }
 
-export class StoreService {
-  private static store: Store = {
-    id: '1',
-    nomeFantasia: 'TechStore Premium',
-    razaoSocial: 'TechStore Premium Comércio de Eletrônicos LTDA',
-    cnpj: '12.345.678/0001-90',
-    cnpjVerificado: false,
-    segmento: 'Eletrônicos',
-    categoriaTributaria: 'Simples Nacional',
-    logo: 'https://images.pexels.com/photos/1029757/pexels-photo-1029757.jpeg?auto=compress&cs=tinysrgb&w=150',
-    endereco: 'Rua das Flores, 123 - São Paulo, SP',
-    telefone: '(11) 3333-4444',
-    descricaoLoja: 'Loja especializada em produtos eletrônicos de alta qualidade com os melhores preços do mercado.',
-    horarioFuncionamento: {
-      segunda: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      terca: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      quarta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      quinta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      sexta: { ativo: true, abertura: '08:00', fechamento: '18:00' },
-      sabado: { ativo: true, abertura: '09:00', fechamento: '17:00' },
-      domingo: { ativo: false, abertura: '09:00', fechamento: '17:00' }
-    },
-    redesSociais: {
-      instagram: '@techstore_premium',
-      facebook: 'TechStorePremium',
-      whatsapp: '5511999999999',
-      website: 'https://techstore.com.br'
-    },
-    tiposEntrega: ['Delivery próprio', 'Retirada no local']
-  };
+export interface StoreDocument {
+  id: string;
+  tipo: string;
+  description?: string;
+  url: string;
+  status: 'PENDENTE' | 'VERIFICADO' | 'REJEITADO';
+  createdAt: Date;
+}
 
-  static async getStore(): Promise<Store> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { ...this.store };
-  }
+export interface StoreWarning {
+  id: string;
+  motivo: string;
+  resolvido: boolean;
+  createdAt: Date;
+}
 
-  static async updateStore(data: Partial<Store>): Promise<Store> {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    this.store = { ...this.store, ...data };
-    return { ...this.store };
-  }
+export const StoreService = {
+  getStore: (): Promise<Store> => api<Store>('/stores/me'),
 
-  static async uploadDocument(file: File, description: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    // Simular upload e verificação
-    this.store.cnpjVerificado = true;
-  }
+  /** CNPJ e status não são editáveis aqui (CNPJ é validado pelo admin na aprovação). */
+  updateStore: (data: Partial<Store>): Promise<Store> => {
+    const { id: _id, cnpj: _cnpj, cnpjVerificado: _v, status: _s, statusReason: _r, ...body } = data;
+    return api<Store>('/stores/me', { method: 'PUT', body });
+  },
 
-  static getSegmentos(): string[] {
+  /** Envia documento comprobatório; fica PENDENTE até a verificação pelo admin. */
+  uploadDocument: async (file: File, description: string): Promise<StoreDocument> => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('description', description);
+    const doc = await api<StoreDocument>('/stores/me/documents', { method: 'POST', body: form });
+    return withDates(doc, ['createdAt']);
+  },
+
+  getDocuments: async (): Promise<StoreDocument[]> =>
+    (await api<StoreDocument[]>('/stores/me/documents')).map((d) => withDates(d, ['createdAt'])),
+
+  getWarnings: async (): Promise<StoreWarning[]> =>
+    (await api<StoreWarning[]>('/stores/me/warnings')).map((w) => withDates(w, ['createdAt'])),
+
+  getSegmentos(): string[] {
     return [
       'Eletrônicos',
       'Moda e Acessórios',
@@ -89,9 +87,9 @@ export class StoreService {
       'Móveis',
       'Outros'
     ];
-  }
+  },
 
-  static getCategoriasTributarias(): Array<{value: string, label: string, description: string}> {
+  getCategoriasTributarias(): Array<{value: string, label: string, description: string}> {
     return [
       {
         value: 'MEI',
@@ -114,9 +112,9 @@ export class StoreService {
         description: 'Para empresas de grande porte'
       }
     ];
-  }
+  },
 
-  static getTiposEntrega(): string[] {
+  getTiposEntrega(): string[] {
     return [
       'Delivery próprio',
       'Retirada no local',
@@ -124,9 +122,9 @@ export class StoreService {
       'Correios',
       'Transportadora'
     ];
-  }
+  },
 
-  static getDiasSemana(): Array<{key: string, label: string}> {
+  getDiasSemana(): Array<{key: string, label: string}> {
     return [
       { key: 'segunda', label: 'Segunda-feira' },
       { key: 'terca', label: 'Terça-feira' },
@@ -136,5 +134,5 @@ export class StoreService {
       { key: 'sabado', label: 'Sábado' },
       { key: 'domingo', label: 'Domingo' }
     ];
-  }
-}
+  },
+};

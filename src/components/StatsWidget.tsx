@@ -1,7 +1,6 @@
 import CountUp from 'react-countup';
 import { Card, CardContent } from '@/components/ui/card';
-import { DivideIcon as LucideIcon } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
 
 interface StatsWidgetProps {
   title: string;

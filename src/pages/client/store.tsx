@@ -1,86 +1,147 @@
-import React from 'react';
-import { useParams } from 'react-router-dom';
-import { Package, MapPin, Clock, Phone, Globe, Star } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Package, MapPin, Clock, Phone, Globe, Instagram, Truck, Search, ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { CatalogService } from '@/services/CatalogService';
+import { AnalyticsService } from '@/services/AnalyticsService';
+import { StoreService } from '@/services/StoreService';
+import { ProductCard } from './ProductCard';
+import { useAddToCart } from './useAddToCart';
 
 export function StorePage() {
-  const { id } = useParams();
+  const { id = '' } = useParams();
+  const [search, setSearch] = useState('');
+  const { add, isPending } = useAddToCart();
+
+  const { data: store, isLoading, isError } = useQuery({
+    queryKey: ['catalog-store', id],
+    queryFn: () => CatalogService.getStore(id),
+    enabled: !!id,
+  });
+  const { data: products = [] } = useQuery({
+    queryKey: ['catalog-store-products', id],
+    queryFn: () => CatalogService.getStoreProducts(id),
+    enabled: !!store,
+  });
+
+  useEffect(() => {
+    if (store) AnalyticsService.track('store_view', store.id);
+  }, [store]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (isError || !store) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
+        <Package className="h-12 w-12 text-gray-400" />
+        <p className="text-gray-600">Loja não encontrada.</p>
+        <Link to="/"><Button>Voltar</Button></Link>
+      </div>
+    );
+  }
+
+  const term = search.trim().toLowerCase();
+  const visible = term ? products.filter((p) => p.nome.toLowerCase().includes(term)) : products;
+  const hours = StoreService.getDiasSemana().filter((d) => store.horarioFuncionamento?.[d.key]?.ativo);
+  const social = store.redesSociais ?? {};
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Store Header */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Link to="/cliente" className="inline-flex items-center text-sm text-gray-600 mb-4">
+            <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+          </Link>
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            <div className="h-24 w-24 rounded-xl bg-gray-100 flex items-center justify-center">
-              <Package className="h-12 w-12 text-gray-400" />
+            <div className="h-24 w-24 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden">
+              {store.logo ? (
+                <img src={store.logo} alt={store.nomeFantasia} className="h-full w-full object-cover" />
+              ) : (
+                <Package className="h-12 w-12 text-gray-400" />
+              )}
             </div>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900">TechStore Premium</h1>
-              <p className="text-gray-600 mt-2">
-                Loja especializada em produtos eletrônicos de alta qualidade
-              </p>
-              <div className="flex items-center gap-4 mt-4">
-                <div className="flex items-center gap-1">
-                  <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                  <span className="text-sm font-medium">4.8</span>
-                  <span className="text-sm text-gray-500">(124 avaliações)</span>
-                </div>
-                <Badge variant="success">Verificada</Badge>
+              <h1 className="text-3xl font-bold text-gray-900">{store.nomeFantasia}</h1>
+              {store.descricaoLoja && <p className="text-gray-600 mt-2">{store.descricaoLoja}</p>}
+              <div className="flex items-center gap-2 mt-4">
+                <Badge variant="outline">{store.segmento}</Badge>
+                {store.cnpjVerificado && <Badge variant="success">Verificada</Badge>}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Store Info */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Store Details */}
           <div className="lg:col-span-1">
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Informações da Loja</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <MapPin className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">São Paulo, SP</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Clock className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">Seg-Sex: 8h-18h</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Phone className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">(11) 3333-4444</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Globe className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">techstore.com.br</span>
-                </div>
+              <CardContent className="space-y-4 text-sm">
+                {store.endereco && (
+                  <div className="flex items-center gap-3"><MapPin className="h-4 w-4 text-gray-400" />{store.endereco}</div>
+                )}
+                {store.telefone && (
+                  <div className="flex items-center gap-3"><Phone className="h-4 w-4 text-gray-400" />{store.telefone}</div>
+                )}
+                {social.website && (
+                  <div className="flex items-center gap-3"><Globe className="h-4 w-4 text-gray-400" />{social.website}</div>
+                )}
+                {social.instagram && (
+                  <div className="flex items-center gap-3"><Instagram className="h-4 w-4 text-gray-400" />@{social.instagram}</div>
+                )}
+                {store.tiposEntrega?.length > 0 && (
+                  <div className="flex items-center gap-3"><Truck className="h-4 w-4 text-gray-400" />{store.tiposEntrega.join(', ')}</div>
+                )}
+                {hours.length > 0 && (
+                  <div className="flex gap-3">
+                    <Clock className="h-4 w-4 text-gray-400 mt-0.5" />
+                    <div className="space-y-1">
+                      {hours.map((d) => (
+                        <div key={d.key}>
+                          {d.label}: {store.horarioFuncionamento[d.key].abertura}–{store.horarioFuncionamento[d.key].fechamento}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Products */}
           <div className="lg:col-span-3">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Produtos</h2>
-              <Button variant="outline">Filtrar</Button>
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Produtos ({products.length})</h2>
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input className="pl-9" placeholder="Buscar nesta loja" value={search} onChange={(e) => setSearch(e.target.value)} />
+              </div>
             </div>
-            
-            <div className="text-center py-12">
-              <Package className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-4 text-lg font-medium text-gray-900">
-                Produtos em breve
-              </h3>
-              <p className="mt-2 text-gray-600">
-                Esta loja está preparando seu catálogo de produtos.
-              </p>
-            </div>
+
+            {visible.length === 0 ? (
+              <div className="text-center py-12">
+                <Package className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-4 text-lg font-medium text-gray-900">Nenhum produto encontrado</h3>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                {visible.map((p) => (
+                  <ProductCard key={p.id} product={p} onAdd={(prod) => add(prod)} adding={isPending} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

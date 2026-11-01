@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Package, 
@@ -8,20 +8,12 @@ import {
   Truck,
   CheckCircle,
   Clock,
-  AlertCircle,
   X,
   Download,
   RefreshCw,
-  MapPin,
   User,
-  CreditCard,
   Calendar,
-  Phone,
-  Mail,
-  FileText,
   Printer,
-  MessageSquare,
-  ArrowUpRight,
   ArrowDownRight,
   DollarSign,
   ShoppingCart,
@@ -53,7 +45,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { OrdersService } from '@/services/OrdersService';
+import { OrdersService, PAYMENT_METHOD_LABELS, type Order } from '@/services/OrdersService';
 import { FeedbackService } from '@/services/FeedbackService';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/utils';
@@ -62,7 +54,7 @@ export function PedidosPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderDetailsOpen, setOrderDetailsOpen] = useState(false);
   const [updateStatusOpen, setUpdateStatusOpen] = useState(false);
   const [statusUpdate, setStatusUpdate] = useState({
@@ -76,12 +68,12 @@ export function PedidosPage() {
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['orders', user?.lojaId],
-    queryFn: () => OrdersService.getOrders(user?.lojaId || '1')
+    queryFn: () => OrdersService.getOrders()
   });
 
   const { data: orderStats } = useQuery({
     queryKey: ['order-stats', user?.lojaId],
-    queryFn: () => OrdersService.getOrderStats(user?.lojaId || '1')
+    queryFn: () => OrdersService.getOrderStats()
   });
 
   const updateOrderMutation = useMutation({
@@ -94,17 +86,17 @@ export function PedidosPage() {
       setSelectedOrder(null);
       setStatusUpdate({ status: '', trackingCode: '', notes: '' });
     },
-    onError: () => {
-      FeedbackService.error('Erro ao atualizar status do pedido');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao atualizar status do pedido');
     }
   });
 
-  const handleViewOrder = (order: any) => {
+  const handleViewOrder = (order: Order) => {
     setSelectedOrder(order);
     setOrderDetailsOpen(true);
   };
 
-  const handleUpdateStatus = (order: any) => {
+  const handleUpdateStatus = (order: Order) => {
     setSelectedOrder(order);
     setStatusUpdate({
       status: order.status,
@@ -130,14 +122,14 @@ export function PedidosPage() {
 
   const filteredOrders = orders.filter(order => {
     const matchesSearch = searchQuery === '' || 
-      order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customer.email.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
     
     const matchesDate = dateFilter === 'all' || (() => {
-      const orderDate = new Date(order.createdAt);
+      const orderDate = order.createdAt;
       const today = new Date();
       const diffTime = today.getTime() - orderDate.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -193,8 +185,12 @@ export function PedidosPage() {
   };
 
   const exportOrders = () => {
-    // Implementar exportação
-    FeedbackService.success('Exportação iniciada!');
+    const url = URL.createObjectURL(OrdersService.exportOrders(filteredOrders));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pedidos-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   if (isLoading) {
@@ -229,7 +225,10 @@ export function PedidosPage() {
                 <Download className="h-4 w-4 mr-2" />
                 Exportar
               </Button>
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['orders'] });
+                queryClient.invalidateQueries({ queryKey: ['order-stats'] });
+              }}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Atualizar
               </Button>
@@ -295,16 +294,16 @@ export function PedidosPage() {
             </Card>
           </div>
 
-          <Tabs defaultValue="all-orders" className="space-y-6">
+          <Tabs value={statusFilter} onValueChange={setStatusFilter} className="space-y-6">
             <TabsList>
-              <TabsTrigger value="all-orders">Todos os Pedidos</TabsTrigger>
+              <TabsTrigger value="all">Todos os Pedidos</TabsTrigger>
               <TabsTrigger value="pending">Pendentes</TabsTrigger>
               <TabsTrigger value="processing">Em Processamento</TabsTrigger>
               <TabsTrigger value="shipped">Enviados</TabsTrigger>
-              <TabsTrigger value="completed">Concluídos</TabsTrigger>
+              <TabsTrigger value="delivered">Concluídos</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="all-orders" className="space-y-6">
+            <TabsContent value={statusFilter} className="space-y-6">
               {/* Filters */}
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1 max-w-md">
@@ -368,7 +367,7 @@ export function PedidosPage() {
                           <TableCell>
                             <div>
                               <div className="font-medium text-gray-900 dark:text-white">
-                                {order.id}
+                                {order.code}
                               </div>
                               <div className="text-sm text-gray-500 dark:text-gray-400">
                                 {order.items.length} {order.items.length === 1 ? 'item' : 'itens'}
@@ -387,8 +386,8 @@ export function PedidosPage() {
                           </TableCell>
                           <TableCell>
                             <div className="text-sm">
-                              <div>{order.createdAt}</div>
-                              <div className="text-gray-500">{order.createdTime}</div>
+                              <div>{order.createdAt.toLocaleDateString('pt-BR')}</div>
+                              <div className="text-gray-500">{order.createdAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -428,46 +427,13 @@ export function PedidosPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-
-            {/* Other tabs would filter orders by status */}
-            <TabsContent value="pending">
-              <Card>
-                <CardContent className="p-6">
-                  <p className="text-gray-600">Pedidos pendentes de confirmação...</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="processing">
-              <Card>
-                <CardContent className="p-6">
-                  <p className="text-gray-600">Pedidos em processamento...</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="shipped">
-              <Card>
-                <CardContent className="p-6">
-                  <p className="text-gray-600">Pedidos enviados...</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="completed">
-              <Card>
-                <CardContent className="p-6">
-                  <p className="text-gray-600">Pedidos concluídos...</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
           </Tabs>
 
           {/* Order Details Modal */}
           <Dialog open={orderDetailsOpen} onOpenChange={setOrderDetailsOpen}>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Detalhes do Pedido {selectedOrder?.id}</DialogTitle>
+                <DialogTitle>Detalhes do Pedido {selectedOrder?.code}</DialogTitle>
                 <DialogDescription>
                   Informações completas do pedido
                 </DialogDescription>
@@ -485,7 +451,7 @@ export function PedidosPage() {
                         <div className="space-y-2">
                           {getStatusBadge(selectedOrder.status)}
                           <p className="text-sm text-gray-600">
-                            Criado em {selectedOrder.createdAt}
+                            Criado em {selectedOrder.createdAt.toLocaleString('pt-BR')}
                           </p>
                           {selectedOrder.trackingCode && (
                             <p className="text-sm">
@@ -504,7 +470,7 @@ export function PedidosPage() {
                         <div className="space-y-2">
                           {getPaymentStatusBadge(selectedOrder.paymentStatus)}
                           <p className="text-sm text-gray-600">
-                            {selectedOrder.paymentMethod}
+                            {PAYMENT_METHOD_LABELS[selectedOrder.paymentMethod] ?? selectedOrder.paymentMethod}
                           </p>
                           <p className="text-lg font-bold text-green-600">
                             {formatCurrency(selectedOrder.total)}
@@ -523,7 +489,7 @@ export function PedidosPage() {
                             <strong>Método:</strong> {selectedOrder.shippingMethod}
                           </p>
                           <p className="text-sm">
-                            <strong>Prazo:</strong> {selectedOrder.estimatedDelivery}
+                            <strong>Prazo:</strong> {selectedOrder.estimatedDelivery || 'A combinar'}
                           </p>
                           <p className="text-sm font-semibold">
                             Frete: {formatCurrency(selectedOrder.shippingCost)}
@@ -575,7 +541,7 @@ export function PedidosPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {selectedOrder.items.map((item: any, index: number) => (
+                        {selectedOrder.items.map((item, index) => (
                           <div key={index} className="flex items-center space-x-4 p-4 border rounded-lg">
                             <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
                               <Package className="h-8 w-8 text-gray-400" />
@@ -630,7 +596,7 @@ export function PedidosPage() {
                 </Button>
                 <Button onClick={() => {
                   setOrderDetailsOpen(false);
-                  handleUpdateStatus(selectedOrder);
+                  if (selectedOrder) handleUpdateStatus(selectedOrder);
                 }}>
                   Atualizar Status
                 </Button>
@@ -644,7 +610,7 @@ export function PedidosPage() {
               <DialogHeader>
                 <DialogTitle>Atualizar Status do Pedido</DialogTitle>
                 <DialogDescription>
-                  Pedido: {selectedOrder?.id}
+                  Pedido: {selectedOrder?.code}
                 </DialogDescription>
               </DialogHeader>
 

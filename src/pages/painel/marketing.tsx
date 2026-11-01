@@ -1,32 +1,25 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  Megaphone, 
-  Plus, 
-  Search, 
-  Filter,
-  Eye,
+import {
+  Megaphone,
+  Plus,
+  Search,
   Edit,
   Trash2,
-  Send,
   Users,
   Mail,
   MessageSquare,
   Gift,
   UserCheck,
-  TrendingUp,
-  Calendar,
-  Target,
-  BarChart3,
   Copy,
-  ExternalLink,
-  Bell
+  Bell,
+  Info
 } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
 import { RoleGuard } from '@/components/RoleGuard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -48,10 +41,49 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { MarketingService } from '@/services/MarketingService';
+import { MarketingService, Campaign, Coupon, Affiliate } from '@/services/MarketingService';
 import { FeedbackService } from '@/services/FeedbackService';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/utils';
+
+// Transições aceitas pela API (draft -> scheduled exige data de agendamento)
+const NEXT_STATUS: Record<Campaign['status'], Campaign['status'][]> = {
+  draft: ['active'],
+  scheduled: ['draft', 'active', 'paused'],
+  active: ['paused', 'completed'],
+  paused: ['active', 'completed'],
+  completed: [],
+};
+
+const STATUS_LABEL: Record<Campaign['status'], string> = {
+  draft: 'Rascunho',
+  scheduled: 'Agendada',
+  active: 'Ativa',
+  paused: 'Pausada',
+  completed: 'Concluída',
+};
+
+const toDateInput = (d: Date) => {
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+
+const matches = (query: string, ...fields: (string | undefined)[]) =>
+  !query || fields.some((f) => f?.toLowerCase().includes(query.toLowerCase()));
+
+const EMPTY_COUPON = {
+  name: '',
+  code: '',
+  type: 'percentage' as 'percentage' | 'fixed' | 'shipping',
+  value: '',
+  minOrderValue: '',
+  maxDiscount: '',
+  usageLimit: '',
+  validFrom: '',
+  validUntil: ''
+};
+
+const EMPTY_AFFILIATE = { name: '', email: '', phone: '', commissionRate: '', referralCode: '' };
 
 export function MarketingPage() {
   const [campaignModalOpen, setCampaignModalOpen] = useState(false);
@@ -63,41 +95,34 @@ export function MarketingPage() {
     type: 'email' as 'email' | 'sms' | 'push' | 'social',
     subject: '',
     content: '',
-    targetAudience: [] as string[]
+    targetAudience: [] as string[],
+    scheduledDate: ''
   });
-  const [couponData, setCouponData] = useState({
-    name: '',
-    code: '',
-    type: 'percentage' as 'percentage' | 'fixed' | 'shipping',
-    value: '',
-    minOrderValue: '',
-    maxDiscount: '',
-    usageLimit: '',
-    validFrom: '',
-    validUntil: ''
-  });
+  const [couponData, setCouponData] = useState(EMPTY_COUPON);
+  const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
+  const [affiliateData, setAffiliateData] = useState(EMPTY_AFFILIATE);
 
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
     queryKey: ['campaigns', user?.lojaId],
-    queryFn: () => MarketingService.getCampaigns(user?.lojaId || '1')
+    queryFn: () => MarketingService.getCampaigns()
   });
 
   const { data: coupons = [], isLoading: couponsLoading } = useQuery({
     queryKey: ['coupons', user?.lojaId],
-    queryFn: () => MarketingService.getCoupons(user?.lojaId || '1')
+    queryFn: () => MarketingService.getCoupons()
   });
 
   const { data: affiliates = [], isLoading: affiliatesLoading } = useQuery({
     queryKey: ['affiliates', user?.lojaId],
-    queryFn: () => MarketingService.getAffiliates(user?.lojaId || '1')
+    queryFn: () => MarketingService.getAffiliates()
   });
 
   const { data: marketingStats } = useQuery({
     queryKey: ['marketing-stats', user?.lojaId],
-    queryFn: () => MarketingService.getMarketingStats(user?.lojaId || '1')
+    queryFn: () => MarketingService.getMarketingStats()
   });
 
   const createCampaignMutation = useMutation({
@@ -107,28 +132,95 @@ export function MarketingPage() {
       queryClient.invalidateQueries({ queryKey: ['marketing-stats'] });
       FeedbackService.success('Campanha criada com sucesso!');
       setCampaignModalOpen(false);
-      setCampaignData({ name: '', type: 'email', subject: '', content: '', targetAudience: [] });
+      setCampaignData({ name: '', type: 'email', subject: '', content: '', targetAudience: [], scheduledDate: '' });
     },
-    onError: () => {
-      FeedbackService.error('Erro ao criar campanha');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao criar campanha');
     }
   });
 
-  const createCouponMutation = useMutation({
-    mutationFn: MarketingService.createCoupon,
+  const invalidateCampaigns = () => {
+    queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+    queryClient.invalidateQueries({ queryKey: ['marketing-stats'] });
+  };
+
+  const updateCampaignMutation = useMutation({
+    mutationFn: MarketingService.updateCampaign,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['coupons'] });
-      queryClient.invalidateQueries({ queryKey: ['marketing-stats'] });
-      FeedbackService.success('Cupom criado com sucesso!');
-      setCouponModalOpen(false);
-      setCouponData({
-        name: '', code: '', type: 'percentage', value: '', minOrderValue: '',
-        maxDiscount: '', usageLimit: '', validFrom: '', validUntil: ''
-      });
+      invalidateCampaigns();
+      FeedbackService.success('Campanha atualizada!');
     },
-    onError: () => {
-      FeedbackService.error('Erro ao criar cupom');
+    onError: (error: Error) => FeedbackService.error(error.message || 'Erro ao atualizar campanha')
+  });
+
+  const deleteCampaignMutation = useMutation({
+    mutationFn: MarketingService.deleteCampaign,
+    onSuccess: () => {
+      invalidateCampaigns();
+      FeedbackService.success('Campanha excluída');
+    },
+    onError: (error: Error) => FeedbackService.error(error.message || 'Erro ao excluir campanha')
+  });
+
+  const invalidateCoupons = () => {
+    queryClient.invalidateQueries({ queryKey: ['coupons'] });
+    queryClient.invalidateQueries({ queryKey: ['marketing-stats'] });
+  };
+
+  const closeCouponModal = () => {
+    setCouponModalOpen(false);
+    setEditingCouponId(null);
+    setCouponData(EMPTY_COUPON);
+  };
+
+  const saveCouponMutation = useMutation({
+    mutationFn: (data: Parameters<typeof MarketingService.createCoupon>[0]) =>
+      editingCouponId ? MarketingService.updateCoupon({ id: editingCouponId, ...data }) : MarketingService.createCoupon(data),
+    onSuccess: () => {
+      invalidateCoupons();
+      FeedbackService.success(editingCouponId ? 'Cupom atualizado!' : 'Cupom criado com sucesso!');
+      closeCouponModal();
+    },
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao salvar cupom');
     }
+  });
+
+  const toggleCouponMutation = useMutation({
+    mutationFn: MarketingService.toggleCoupon,
+    onSuccess: invalidateCoupons,
+    onError: (error: Error) => FeedbackService.error(error.message || 'Erro ao alterar cupom')
+  });
+
+  const deleteCouponMutation = useMutation({
+    mutationFn: MarketingService.deleteCoupon,
+    onSuccess: () => {
+      invalidateCoupons();
+      FeedbackService.success('Cupom excluído');
+    },
+    onError: (error: Error) => FeedbackService.error(error.message || 'Erro ao excluir cupom')
+  });
+
+  const invalidateAffiliates = () => {
+    queryClient.invalidateQueries({ queryKey: ['affiliates'] });
+    queryClient.invalidateQueries({ queryKey: ['marketing-stats'] });
+  };
+
+  const createAffiliateMutation = useMutation({
+    mutationFn: MarketingService.createAffiliate,
+    onSuccess: () => {
+      invalidateAffiliates();
+      FeedbackService.success('Afiliado cadastrado!');
+      setAffiliateModalOpen(false);
+      setAffiliateData(EMPTY_AFFILIATE);
+    },
+    onError: (error: Error) => FeedbackService.error(error.message || 'Erro ao cadastrar afiliado')
+  });
+
+  const updateAffiliateMutation = useMutation({
+    mutationFn: MarketingService.updateAffiliate,
+    onSuccess: invalidateAffiliates,
+    onError: (error: Error) => FeedbackService.error(error.message || 'Erro ao atualizar afiliado')
   });
 
   const handleCreateCampaign = () => {
@@ -137,14 +229,20 @@ export function MarketingPage() {
       return;
     }
 
+    const scheduledDate = campaignData.scheduledDate ? new Date(campaignData.scheduledDate) : undefined;
     createCampaignMutation.mutate({
       name: campaignData.name,
       type: campaignData.type,
-      subject: campaignData.subject,
+      subject: campaignData.subject || undefined,
       content: campaignData.content,
       targetAudience: campaignData.targetAudience,
-      status: 'draft'
+      scheduledDate,
+      status: scheduledDate ? 'scheduled' : 'draft'
     });
+  };
+
+  const handleDeleteCampaign = (campaign: Campaign) => {
+    if (window.confirm(`Excluir a campanha "${campaign.name}"?`)) deleteCampaignMutation.mutate(campaign.id);
   };
 
   const handleCreateCoupon = () => {
@@ -153,7 +251,7 @@ export function MarketingPage() {
       return;
     }
 
-    createCouponMutation.mutate({
+    saveCouponMutation.mutate({
       name: couponData.name,
       code: couponData.code.toUpperCase(),
       type: couponData.type,
@@ -161,12 +259,58 @@ export function MarketingPage() {
       minOrderValue: couponData.minOrderValue ? parseFloat(couponData.minOrderValue) : undefined,
       maxDiscount: couponData.maxDiscount ? parseFloat(couponData.maxDiscount) : undefined,
       usageLimit: couponData.usageLimit ? parseInt(couponData.usageLimit) : undefined,
-      validFrom: new Date(couponData.validFrom || Date.now()),
-      validUntil: new Date(couponData.validUntil || Date.now() + 30 * 24 * 60 * 60 * 1000),
+      // datas do formulário no fuso local: início do primeiro dia até o fim do último
+      validFrom: couponData.validFrom ? new Date(`${couponData.validFrom}T00:00:00`) : new Date(),
+      validUntil: couponData.validUntil
+        ? new Date(`${couponData.validUntil}T23:59:59`)
+        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       isActive: true,
       applicableProducts: []
     });
   };
+
+  const handleEditCoupon = (coupon: Coupon) => {
+    setEditingCouponId(coupon.id);
+    setCouponData({
+      name: coupon.name,
+      code: coupon.code,
+      type: coupon.type,
+      value: String(coupon.value),
+      minOrderValue: coupon.minOrderValue != null ? String(coupon.minOrderValue) : '',
+      maxDiscount: coupon.maxDiscount != null ? String(coupon.maxDiscount) : '',
+      usageLimit: coupon.usageLimit != null ? String(coupon.usageLimit) : '',
+      validFrom: toDateInput(coupon.validFrom),
+      validUntil: toDateInput(coupon.validUntil)
+    });
+    setCouponModalOpen(true);
+  };
+
+  const handleDeleteCoupon = (coupon: Coupon) => {
+    if (window.confirm(`Excluir o cupom ${coupon.code}?`)) deleteCouponMutation.mutate(coupon.id);
+  };
+
+  const handleCreateAffiliate = () => {
+    const rate = parseFloat(affiliateData.commissionRate);
+    if (!affiliateData.name || !affiliateData.email || !affiliateData.referralCode || Number.isNaN(rate)) {
+      FeedbackService.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+    createAffiliateMutation.mutate({
+      name: affiliateData.name,
+      email: affiliateData.email,
+      phone: affiliateData.phone,
+      commissionRate: rate,
+      referralCode: affiliateData.referralCode.toUpperCase(),
+      status: 'active'
+    });
+  };
+
+  const toggleAffiliate = (affiliate: Affiliate) =>
+    updateAffiliateMutation.mutate({ id: affiliate.id, status: affiliate.status === 'active' ? 'inactive' : 'active' });
+
+  const filteredCampaigns = campaigns.filter((c) => matches(searchQuery, c.name, c.subject));
+  const filteredCoupons = coupons.filter((c) => matches(searchQuery, c.name, c.code));
+  const filteredAffiliates = affiliates.filter((a) => matches(searchQuery, a.name, a.email, a.referralCode));
 
   const generateCouponCode = () => {
     const code = MarketingService.generateCouponCode();
@@ -311,11 +455,19 @@ export function MarketingPage() {
                     className="pl-10"
                   />
                 </div>
-                
+
                 <Button onClick={() => setCampaignModalOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Nova Campanha
                 </Button>
+              </div>
+
+              <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
+                <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>
+                  Envio automático não configurado: as campanhas ficam registradas e agendadas aqui,
+                  mas nenhum email, SMS ou push é disparado. Por isso as métricas permanecem zeradas.
+                </span>
               </div>
 
               {/* Campaigns Table */}
@@ -334,7 +486,14 @@ export function MarketingPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {campaigns.map((campaign) => {
+                      {filteredCampaigns.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                            Nenhuma campanha cadastrada
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {filteredCampaigns.map((campaign) => {
                         const CampaignIcon = getCampaignIcon(campaign.type);
                         return (
                           <TableRow key={campaign.id}>
@@ -375,7 +534,7 @@ export function MarketingPage() {
                                 <div className="flex items-center justify-between">
                                   <span className="text-gray-500">Abertos:</span>
                                   <span className="font-medium">
-                                    {campaign.stats.opened} ({Math.round(campaign.stats.opened / campaign.stats.sent * 100)}%)
+                                    {campaign.stats.opened} ({campaign.stats.sent ? Math.round(campaign.stats.opened / campaign.stats.sent * 100) : 0}%)
                                   </span>
                                 </div>
                                 <div className="flex items-center justify-between">
@@ -409,14 +568,30 @@ export function MarketingPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end space-x-2">
-                                <Button variant="ghost" size="icon">
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon">
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon">
-                                  <BarChart3 className="h-4 w-4" />
+                                {NEXT_STATUS[campaign.status].length > 0 && (
+                                  <Select
+                                    value=""
+                                    onValueChange={(value) =>
+                                      updateCampaignMutation.mutate({ id: campaign.id, status: value as Campaign['status'] })
+                                    }
+                                  >
+                                    <SelectTrigger className="w-36 h-8" aria-label="Alterar status">
+                                      <SelectValue placeholder="Alterar status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {NEXT_STATUS[campaign.status].map((next) => (
+                                        <SelectItem key={next} value={next}>{STATUS_LABEL[next]}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteCampaign(campaign)}
+                                  aria-label="Excluir campanha"
+                                >
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
                             </TableCell>
@@ -440,7 +615,7 @@ export function MarketingPage() {
                     className="pl-10"
                   />
                 </div>
-                
+
                 <Button onClick={() => setCouponModalOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Novo Cupom
@@ -464,7 +639,14 @@ export function MarketingPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {coupons.map((coupon) => (
+                      {filteredCoupons.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-gray-500 py-8">
+                            Nenhum cupom cadastrado
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {filteredCoupons.map((coupon) => (
                         <TableRow key={coupon.id}>
                           <TableCell>
                             <div className="font-medium text-gray-900 dark:text-white">
@@ -476,9 +658,9 @@ export function MarketingPage() {
                               <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm font-mono">
                                 {coupon.code}
                               </code>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 className="h-6 w-6"
                                 onClick={() => copyCouponCode(coupon.code)}
                               >
@@ -519,16 +701,23 @@ export function MarketingPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={coupon.isActive ? 'success' : 'secondary'}>
-                              {coupon.isActive ? 'Ativo' : 'Inativo'}
-                            </Badge>
+                            <button
+                              type="button"
+                              onClick={() => toggleCouponMutation.mutate(coupon.id)}
+                              disabled={toggleCouponMutation.isPending}
+                              title="Clique para ativar/desativar"
+                            >
+                              <Badge variant={coupon.isActive ? 'success' : 'secondary'}>
+                                {coupon.isActive ? 'Ativo' : 'Inativo'}
+                              </Badge>
+                            </button>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end space-x-2">
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" onClick={() => handleEditCoupon(coupon)} aria-label="Editar cupom">
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteCoupon(coupon)} aria-label="Excluir cupom">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -552,12 +741,16 @@ export function MarketingPage() {
                     className="pl-10"
                   />
                 </div>
-                
+
                 <Button onClick={() => setAffiliateModalOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Novo Afiliado
                 </Button>
               </div>
+
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Vendas e comissões por afiliado ainda não são rastreadas automaticamente; os totais permanecem zerados.
+              </p>
 
               {/* Affiliates Table */}
               <Card>
@@ -575,7 +768,14 @@ export function MarketingPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {affiliates.map((affiliate) => (
+                      {filteredAffiliates.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                            Nenhum afiliado cadastrado
+                          </TableCell>
+                        </TableRow>
+                      )}
+                      {filteredAffiliates.map((affiliate) => (
                         <TableRow key={affiliate.id}>
                           <TableCell>
                             <div className="font-medium text-gray-900 dark:text-white">
@@ -590,9 +790,9 @@ export function MarketingPage() {
                               <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm font-mono">
                                 {affiliate.referralCode}
                               </code>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 className="h-6 w-6"
                                 onClick={() => copyCouponCode(affiliate.referralCode)}
                               >
@@ -610,20 +810,19 @@ export function MarketingPage() {
                             {formatCurrency(affiliate.totalCommission)}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={affiliate.status === 'active' ? 'success' : 'secondary'}>
-                              {affiliate.status === 'active' ? 'Ativo' : 'Inativo'}
+                            <Badge variant={affiliate.status === 'active' ? 'success' : affiliate.status === 'pending' ? 'warning' : 'secondary'}>
+                              {affiliate.status === 'active' ? 'Ativo' : affiliate.status === 'pending' ? 'Pendente' : 'Inativo'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end space-x-2">
-                              <Button variant="ghost" size="icon">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon">
-                                <ExternalLink className="h-4 w-4" />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toggleAffiliate(affiliate)}
+                                disabled={updateAffiliateMutation.isPending}
+                              >
+                                {affiliate.status === 'active' ? 'Desativar' : 'Ativar'}
                               </Button>
                             </div>
                           </TableCell>
@@ -659,9 +858,9 @@ export function MarketingPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="campaign-type">Tipo de Campanha *</Label>
-                  <Select 
-                    value={campaignData.type} 
-                    onValueChange={(value) => setCampaignData(prev => ({ ...prev, type: value as any }))}
+                  <Select
+                    value={campaignData.type}
+                    onValueChange={(value) => setCampaignData(prev => ({ ...prev, type: value as typeof prev.type }))}
                   >
                     <SelectTrigger id="campaign-type">
                       <SelectValue placeholder="Selecione o tipo" />
@@ -700,8 +899,8 @@ export function MarketingPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="campaign-audience">Público-alvo</Label>
-                  <Select 
-                    value={campaignData.targetAudience[0] || ''} 
+                  <Select
+                    value={campaignData.targetAudience[0] || ''}
                     onValueChange={(value) => setCampaignData(prev => ({ ...prev, targetAudience: [value] }))}
                   >
                     <SelectTrigger id="campaign-audience">
@@ -715,13 +914,23 @@ export function MarketingPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="campaign-schedule">Agendar para (opcional)</Label>
+                  <Input
+                    id="campaign-schedule"
+                    type="datetime-local"
+                    value={campaignData.scheduledDate}
+                    onChange={(e) => setCampaignData(prev => ({ ...prev, scheduledDate: e.target.value }))}
+                  />
+                </div>
               </div>
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setCampaignModalOpen(false)}>
                   Cancelar
                 </Button>
-                <Button 
+                <Button
                   onClick={handleCreateCampaign}
                   disabled={createCampaignMutation.isPending}
                 >
@@ -732,10 +941,10 @@ export function MarketingPage() {
           </Dialog>
 
           {/* Create Coupon Modal */}
-          <Dialog open={couponModalOpen} onOpenChange={setCouponModalOpen}>
+          <Dialog open={couponModalOpen} onOpenChange={(open) => (open ? setCouponModalOpen(true) : closeCouponModal())}>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Novo Cupom</DialogTitle>
+                <DialogTitle>{editingCouponId ? 'Editar Cupom' : 'Novo Cupom'}</DialogTitle>
                 <DialogDescription>
                   Crie um novo cupom de desconto para seus clientes
                 </DialogDescription>
@@ -755,9 +964,9 @@ export function MarketingPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="coupon-code">Código do Cupom *</Label>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={generateCouponCode}
                       type="button"
                     >
@@ -776,9 +985,9 @@ export function MarketingPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="coupon-type">Tipo de Desconto *</Label>
-                    <Select 
-                      value={couponData.type} 
-                      onValueChange={(value) => setCouponData(prev => ({ ...prev, type: value as any }))}
+                    <Select
+                      value={couponData.type}
+                      onValueChange={(value) => setCouponData(prev => ({ ...prev, type: value as typeof prev.type }))}
                     >
                       <SelectTrigger id="coupon-type">
                         <SelectValue placeholder="Selecione o tipo" />
@@ -793,8 +1002,8 @@ export function MarketingPage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="coupon-value">
-                      {couponData.type === 'percentage' ? 'Percentual de Desconto (%) *' : 
-                       couponData.type === 'fixed' ? 'Valor do Desconto (R$) *' : 
+                      {couponData.type === 'percentage' ? 'Percentual de Desconto (%) *' :
+                       couponData.type === 'fixed' ? 'Valor do Desconto (R$) *' :
                        'Valor Mínimo para Frete Grátis (R$)'}
                     </Label>
                     <Input
@@ -878,14 +1087,88 @@ export function MarketingPage() {
               </div>
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setCouponModalOpen(false)}>
+                <Button variant="outline" onClick={closeCouponModal}>
                   Cancelar
                 </Button>
-                <Button 
+                <Button
                   onClick={handleCreateCoupon}
-                  disabled={createCouponMutation.isPending}
+                  disabled={saveCouponMutation.isPending}
                 >
-                  {createCouponMutation.isPending ? 'Criando...' : 'Criar Cupom'}
+                  {saveCouponMutation.isPending ? 'Salvando...' : editingCouponId ? 'Salvar Cupom' : 'Criar Cupom'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Create Affiliate Modal */}
+          <Dialog open={affiliateModalOpen} onOpenChange={setAffiliateModalOpen}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Novo Afiliado</DialogTitle>
+                <DialogDescription>
+                  Cadastre um parceiro com código de indicação próprio
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="affiliate-name">Nome *</Label>
+                  <Input
+                    id="affiliate-name"
+                    value={affiliateData.name}
+                    onChange={(e) => setAffiliateData(prev => ({ ...prev, name: e.target.value }))}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="affiliate-email">Email *</Label>
+                    <Input
+                      id="affiliate-email"
+                      type="email"
+                      value={affiliateData.email}
+                      onChange={(e) => setAffiliateData(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="affiliate-phone">Telefone</Label>
+                    <Input
+                      id="affiliate-phone"
+                      value={affiliateData.phone}
+                      onChange={(e) => setAffiliateData(prev => ({ ...prev, phone: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="affiliate-rate">Comissão (%) *</Label>
+                    <Input
+                      id="affiliate-rate"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={affiliateData.commissionRate}
+                      onChange={(e) => setAffiliateData(prev => ({ ...prev, commissionRate: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="affiliate-code">Código de indicação *</Label>
+                    <Input
+                      id="affiliate-code"
+                      className="uppercase"
+                      value={affiliateData.referralCode}
+                      onChange={(e) => setAffiliateData(prev => ({ ...prev, referralCode: e.target.value.toUpperCase() }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAffiliateModalOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleCreateAffiliate} disabled={createAffiliateMutation.isPending}>
+                  {createAffiliateMutation.isPending ? 'Salvando...' : 'Cadastrar Afiliado'}
                 </Button>
               </DialogFooter>
             </DialogContent>

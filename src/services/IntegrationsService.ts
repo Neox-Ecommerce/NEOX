@@ -1,3 +1,5 @@
+import { api, withDates } from '@/lib/api';
+
 export interface PaymentGateway {
   id: string;
   name: string;
@@ -53,7 +55,9 @@ export interface Integration {
   provider: string;
   description: string;
   isActive: boolean;
-  config: Record<string, any>;
+  config: Record<string, string>;
+  /** Campos configuráveis do catálogo (secret = guardado criptografado e exibido mascarado). */
+  fields: Array<{ key: string; label: string; secret: boolean }>;
   lastSync?: Date;
   createdAt: Date;
 }
@@ -64,324 +68,70 @@ export interface Webhook {
   url: string;
   events: string[];
   isActive: boolean;
-  secret?: string;
+  secret?: string; // sempre mascarado (••••1234) nas respostas da API
   lastTriggered?: Date;
   successCount: number;
   errorCount: number;
   createdAt: Date;
 }
 
-export class IntegrationsService {
-  private static GATEWAYS_KEY = 'neoxstore_payment_gateways';
-  private static CARRIERS_KEY = 'neoxstore_shipping_carriers';
-  private static INTEGRATIONS_KEY = 'neoxstore_integrations';
-  private static WEBHOOKS_KEY = 'neoxstore_webhooks';
+export type GatewayInput = {
+  provider: string; // id do catálogo (getAvailableGateways)
+  type: PaymentGateway['type'];
+  isActive?: boolean;
+  config: Partial<PaymentGateway['config']>;
+  fees: PaymentGateway['fees'];
+};
 
-  private static getStoredGateways(): PaymentGateway[] {
-    const stored = localStorage.getItem(this.GATEWAYS_KEY);
-    if (stored) {
-      return JSON.parse(stored).map((gateway: any) => ({
-        ...gateway,
-        createdAt: new Date(gateway.createdAt),
-        updatedAt: new Date(gateway.updatedAt)
-      }));
-    }
-    
-    const seedGateways: PaymentGateway[] = [
-      {
-        id: '1',
-        name: 'Stripe',
-        type: 'credit_card',
-        provider: 'Stripe',
-        isActive: true,
-        config: {
-          apiKey: 'pk_test_***',
-          secretKey: 'sk_test_***',
-          environment: 'sandbox',
-          webhookUrl: 'https://api.neoxstore.com/webhooks/stripe'
-        },
-        fees: {
-          creditCard: 3.99,
-          debitCard: 2.99,
-          pix: 0.99,
-          boleto: 3.49
-        },
-        createdAt: new Date('2023-06-15'),
-        updatedAt: new Date('2024-01-15')
-      },
-      {
-        id: '2',
-        name: 'PagSeguro',
-        type: 'pix',
-        provider: 'PagSeguro',
-        isActive: true,
-        config: {
-          apiKey: 'app_***',
-          environment: 'sandbox',
-          webhookUrl: 'https://api.neoxstore.com/webhooks/pagseguro'
-        },
-        fees: {
-          creditCard: 4.99,
-          debitCard: 3.49,
-          pix: 0.99,
-          boleto: 3.99
-        },
-        createdAt: new Date('2023-08-20'),
-        updatedAt: new Date('2024-01-10')
-      }
-    ];
-    
-    this.saveGateways(seedGateways);
-    return seedGateways;
-  }
+export type CarrierInput = {
+  code: string; // id do catálogo (getAvailableCarriers)
+  isActive?: boolean;
+  config: Partial<ShippingCarrier['config']>;
+  coverage: ShippingCarrier['coverage'];
+};
 
-  private static getStoredCarriers(): ShippingCarrier[] {
-    const stored = localStorage.getItem(this.CARRIERS_KEY);
-    if (stored) {
-      return JSON.parse(stored).map((carrier: any) => ({
-        ...carrier,
-        createdAt: new Date(carrier.createdAt),
-        updatedAt: new Date(carrier.updatedAt)
-      }));
-    }
-    
-    const seedCarriers: ShippingCarrier[] = [
-      {
-        id: '1',
-        name: 'Correios',
-        code: 'correios',
-        type: 'correios',
-        isActive: true,
-        config: {
-          contractCode: '9912345678',
-          password: 'senha123',
-          services: ['PAC', 'SEDEX', 'SEDEX 10']
-        },
-        coverage: {
-          regions: ['Nacional'],
-          maxWeight: 30,
-          maxDimensions: {
-            length: 105,
-            width: 105,
-            height: 105
-          }
-        },
-        createdAt: new Date('2023-06-15'),
-        updatedAt: new Date('2024-01-15')
-      },
-      {
-        id: '2',
-        name: 'Transportadora Express',
-        code: 'express',
-        type: 'transportadora',
-        isActive: true,
-        config: {
-          apiKey: 'api_key_express',
-          services: ['Expressa', 'Econômica']
-        },
-        coverage: {
-          regions: ['Sudeste', 'Sul'],
-          maxWeight: 50,
-          maxDimensions: {
-            length: 150,
-            width: 150,
-            height: 150
-          }
-        },
-        createdAt: new Date('2023-09-10'),
-        updatedAt: new Date('2024-01-12')
-      }
-    ];
-    
-    this.saveCarriers(seedCarriers);
-    return seedCarriers;
-  }
+export type WebhookInput = Omit<Webhook, 'id' | 'successCount' | 'errorCount' | 'createdAt' | 'lastTriggered'>;
 
-  private static getStoredIntegrations(): Integration[] {
-    const stored = localStorage.getItem(this.INTEGRATIONS_KEY);
-    if (stored) {
-      return JSON.parse(stored).map((integration: any) => ({
-        ...integration,
-        lastSync: integration.lastSync ? new Date(integration.lastSync) : undefined,
-        createdAt: new Date(integration.createdAt)
-      }));
-    }
-    
-    const seedIntegrations: Integration[] = [
-      {
-        id: '1',
-        name: 'Google Analytics',
-        category: 'analytics',
-        provider: 'Google',
-        description: 'Análise de tráfego e comportamento dos usuários',
-        isActive: true,
-        config: {
-          trackingId: 'GA-XXXXXXXXX',
-          enhancedEcommerce: true
-        },
-        lastSync: new Date('2024-01-22T10:30:00'),
-        createdAt: new Date('2023-06-15')
-      },
-      {
-        id: '2',
-        name: 'Mailchimp',
-        category: 'marketing',
-        provider: 'Mailchimp',
-        description: 'Email marketing e automação',
-        isActive: false,
-        config: {
-          apiKey: 'mc_api_***',
-          listId: 'list_123'
-        },
-        createdAt: new Date('2023-08-20')
-      }
-    ];
-    
-    this.saveIntegrations(seedIntegrations);
-    return seedIntegrations;
-  }
+const gw = (g: PaymentGateway) => withDates(g, ['createdAt', 'updatedAt']);
+const carrier = (c: ShippingCarrier) => withDates(c, ['createdAt', 'updatedAt']);
+const app = (i: Integration) => withDates(i, ['createdAt', 'lastSync']);
+const hook = (w: Webhook) => withDates(w, ['createdAt', 'lastTriggered']);
 
-  private static getStoredWebhooks(): Webhook[] {
-    const stored = localStorage.getItem(this.WEBHOOKS_KEY);
-    if (stored) {
-      return JSON.parse(stored).map((webhook: any) => ({
-        ...webhook,
-        lastTriggered: webhook.lastTriggered ? new Date(webhook.lastTriggered) : undefined,
-        createdAt: new Date(webhook.createdAt)
-      }));
-    }
-    
-    const seedWebhooks: Webhook[] = [
-      {
-        id: '1',
-        name: 'Notificação de Pedidos',
-        url: 'https://api.exemplo.com/webhooks/orders',
-        events: ['order.created', 'order.updated', 'order.cancelled'],
-        isActive: true,
-        secret: 'webhook_secret_123',
-        lastTriggered: new Date('2024-01-22T14:30:00'),
-        successCount: 156,
-        errorCount: 3,
-        createdAt: new Date('2023-06-15')
-      }
-    ];
-    
-    this.saveWebhooks(seedWebhooks);
-    return seedWebhooks;
-  }
+// Configurações por loja (a loja vem do token). Os pagamentos dos pedidos passam pelo Mercado Pago da plataforma.
+export const IntegrationsService = {
+  getPaymentGateways: async (): Promise<PaymentGateway[]> =>
+    (await api<PaymentGateway[]>('/integrations/gateways')).map(gw),
+  createGateway: async (data: GatewayInput): Promise<PaymentGateway> =>
+    gw(await api<PaymentGateway>('/integrations/gateways', { method: 'POST', body: data })),
+  updateGateway: async (gatewayId: string, data: Partial<GatewayInput & { isActive: boolean }>): Promise<PaymentGateway> =>
+    gw(await api<PaymentGateway>(`/integrations/gateways/${gatewayId}`, { method: 'PUT', body: data })),
+  deleteGateway: (gatewayId: string): Promise<void> => api(`/integrations/gateways/${gatewayId}`, { method: 'DELETE' }),
 
-  private static saveGateways(gateways: PaymentGateway[]): void {
-    localStorage.setItem(this.GATEWAYS_KEY, JSON.stringify(gateways));
-  }
+  getShippingCarriers: async (): Promise<ShippingCarrier[]> =>
+    (await api<ShippingCarrier[]>('/integrations/carriers')).map(carrier),
+  createCarrier: async (data: CarrierInput): Promise<ShippingCarrier> =>
+    carrier(await api<ShippingCarrier>('/integrations/carriers', { method: 'POST', body: data })),
+  updateCarrier: async (carrierId: string, data: Partial<CarrierInput & { isActive: boolean }>): Promise<ShippingCarrier> =>
+    carrier(await api<ShippingCarrier>(`/integrations/carriers/${carrierId}`, { method: 'PUT', body: data })),
+  deleteCarrier: (carrierId: string): Promise<void> => api(`/integrations/carriers/${carrierId}`, { method: 'DELETE' }),
 
-  private static saveCarriers(carriers: ShippingCarrier[]): void {
-    localStorage.setItem(this.CARRIERS_KEY, JSON.stringify(carriers));
-  }
+  getIntegrations: async (): Promise<Integration[]> => (await api<Integration[]>('/integrations/apps')).map(app),
+  updateIntegration: async (id: string, data: { isActive?: boolean; config?: Record<string, string> }): Promise<Integration> =>
+    app(await api<Integration>(`/integrations/apps/${id}`, { method: 'PUT', body: data })),
+  toggleIntegration: async (id: string): Promise<Integration> =>
+    app(await api<Integration>(`/integrations/apps/${id}/toggle`, { method: 'POST' })),
 
-  private static saveIntegrations(integrations: Integration[]): void {
-    localStorage.setItem(this.INTEGRATIONS_KEY, JSON.stringify(integrations));
-  }
+  getWebhooks: async (): Promise<Webhook[]> => (await api<Webhook[]>('/integrations/webhooks')).map(hook),
+  createWebhook: async (data: WebhookInput): Promise<Webhook> =>
+    hook(await api<Webhook>('/integrations/webhooks', { method: 'POST', body: data })),
+  updateWebhook: async (id: string, data: Partial<WebhookInput>): Promise<Webhook> =>
+    hook(await api<Webhook>(`/integrations/webhooks/${id}`, { method: 'PUT', body: data })),
+  deleteWebhook: (id: string): Promise<void> => api(`/integrations/webhooks/${id}`, { method: 'DELETE' }),
+  /** Envia um evento de teste assinado (X-Neox-Signature: sha256=HMAC do corpo com o secret). */
+  testWebhook: (webhookId: string): Promise<{ success: boolean; message: string }> =>
+    api(`/integrations/webhooks/${webhookId}/test`, { method: 'POST' }),
 
-  private static saveWebhooks(webhooks: Webhook[]): void {
-    localStorage.setItem(this.WEBHOOKS_KEY, JSON.stringify(webhooks));
-  }
-
-  static async getPaymentGateways(lojaId: string): Promise<PaymentGateway[]> {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    return this.getStoredGateways()
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }
-
-  static async getShippingCarriers(lojaId: string): Promise<ShippingCarrier[]> {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    return this.getStoredCarriers()
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  }
-
-  static async getIntegrations(lojaId: string): Promise<Integration[]> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return this.getStoredIntegrations()
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  static async getWebhooks(lojaId: string): Promise<Webhook[]> {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return this.getStoredWebhooks()
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }
-
-  static async updateGateway(gatewayId: string, data: Partial<PaymentGateway>): Promise<PaymentGateway> {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const gateways = this.getStoredGateways();
-    const gatewayIndex = gateways.findIndex(g => g.id === gatewayId);
-    
-    if (gatewayIndex === -1) {
-      throw new Error('Gateway não encontrado');
-    }
-    
-    gateways[gatewayIndex] = {
-      ...gateways[gatewayIndex],
-      ...data,
-      updatedAt: new Date()
-    };
-    
-    this.saveGateways(gateways);
-    return gateways[gatewayIndex];
-  }
-
-  static async updateCarrier(carrierId: string, data: Partial<ShippingCarrier>): Promise<ShippingCarrier> {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const carriers = this.getStoredCarriers();
-    const carrierIndex = carriers.findIndex(c => c.id === carrierId);
-    
-    if (carrierIndex === -1) {
-      throw new Error('Transportadora não encontrada');
-    }
-    
-    carriers[carrierIndex] = {
-      ...carriers[carrierIndex],
-      ...data,
-      updatedAt: new Date()
-    };
-    
-    this.saveCarriers(carriers);
-    return carriers[carrierIndex];
-  }
-
-  static async createWebhook(data: Omit<Webhook, 'id' | 'successCount' | 'errorCount' | 'createdAt'>): Promise<Webhook> {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const webhooks = this.getStoredWebhooks();
-    const newWebhook: Webhook = {
-      ...data,
-      id: Date.now().toString(),
-      successCount: 0,
-      errorCount: 0,
-      createdAt: new Date()
-    };
-    
-    webhooks.unshift(newWebhook);
-    this.saveWebhooks(webhooks);
-    return newWebhook;
-  }
-
-  static async testWebhook(webhookId: string): Promise<{ success: boolean; message: string }> {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Simulate webhook test
-    const success = Math.random() > 0.2; // 80% success rate
-    
-    return {
-      success,
-      message: success 
-        ? 'Webhook testado com sucesso! Resposta 200 OK recebida.'
-        : 'Falha no teste do webhook. Verifique a URL e tente novamente.'
-    };
-  }
-
-  static getAvailableGateways(): Array<{
+  getAvailableGateways(): Array<{
     id: string;
     name: string;
     provider: string;
@@ -418,9 +168,9 @@ export class IntegrationsService {
         description: 'Gateway internacional com carteira PayPal'
       }
     ];
-  }
+  },
 
-  static getAvailableCarriers(): Array<{
+  getAvailableCarriers(): Array<{
     id: string;
     name: string;
     type: string;
@@ -452,5 +202,5 @@ export class IntegrationsService {
         description: 'Entrega rápida por motoboy em capitais'
       }
     ];
-  }
-}
+  },
+};

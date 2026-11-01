@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   FileText, 
@@ -9,7 +9,6 @@ import {
   DollarSign,
   ShoppingBag,
   Users,
-  ArrowUpRight,
   ArrowDownRight,
   Percent,
   Target,
@@ -25,7 +24,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ReportsService } from '@/services/ReportsService';
 import { FeedbackService } from '@/services/FeedbackService';
-import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/utils';
 import {
   LineChart,
@@ -45,26 +43,39 @@ import {
 
 export function RelatoriosPage() {
   const [periodFilter, setPeriodFilter] = useState<string>('month');
-  const { user } = useAuth();
 
   const { data: salesReport, isLoading: salesLoading } = useQuery({
-    queryKey: ['sales-report', user?.lojaId, periodFilter],
-    queryFn: () => ReportsService.getSalesReport(user?.lojaId || '1', periodFilter)
+    queryKey: ['sales-report', periodFilter],
+    queryFn: () => ReportsService.getSalesReport(periodFilter)
   });
 
   const { data: conversionReport, isLoading: conversionLoading } = useQuery({
-    queryKey: ['conversion-report', user?.lojaId, periodFilter],
-    queryFn: () => ReportsService.getConversionReport(user?.lojaId || '1', periodFilter)
+    queryKey: ['conversion-report', periodFilter],
+    queryFn: () => ReportsService.getConversionReport(periodFilter)
   });
 
   const { data: funnelReport, isLoading: funnelLoading } = useQuery({
-    queryKey: ['funnel-report', user?.lojaId, periodFilter],
-    queryFn: () => ReportsService.getFunnelReport(user?.lojaId || '1', periodFilter)
+    queryKey: ['funnel-report', periodFilter],
+    queryFn: () => ReportsService.getFunnelReport(periodFilter)
   });
 
-  const handleExportReport = async (type: string, data: any) => {
+  // "YYYY-MM-DD" é dia local; new Date() leria como UTC e mostraria o dia anterior
+  const formatDay = (value: string) => `${value.slice(8, 10)}/${value.slice(5, 7)}`;
+
+  // Sugestões só aparecem quando a etapa tem perda real no período (índice da etapa no funil).
+  const suggestions = [
+    { index: 2, icon: TrendingUp, color: 'bg-yellow-100 text-yellow-800', title: 'Otimize a página de produto',
+      text: (p: string) => `${p}% de quem viu um produto não adicionou ao carrinho. Melhore descrições, fotos e destaque avaliações.` },
+    { index: 3, icon: DollarSign, color: 'bg-green-100 text-green-800', title: 'Recupere carrinhos abandonados',
+      text: (p: string) => `${p}% de quem adicionou ao carrinho não iniciou o checkout. Considere cupons ou lembretes para recuperar essas vendas.` },
+    { index: 4, icon: Target, color: 'bg-blue-100 text-blue-800', title: 'Simplifique o checkout',
+      text: (p: string) => `${p}% de quem iniciou o checkout não concluiu a compra. Reduza campos obrigatórios e revise as opções de frete e pagamento.` },
+  ].filter((sug) => (funnelReport?.steps[sug.index]?.dropoffRate ?? 0) > 0);
+
+  const handleExportReport = (type: 'sales' | 'conversion' | 'funnel', data?: Parameters<typeof ReportsService.exportReport>[1]) => {
+    if (!data) return;
     try {
-      const blob = await ReportsService.exportReport(type, data);
+      const blob = ReportsService.exportReport(type, data);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -74,7 +85,7 @@ export function RelatoriosPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       FeedbackService.success('Relatório exportado com sucesso!');
-    } catch (error) {
+    } catch {
       FeedbackService.error('Erro ao exportar relatório');
     }
   };
@@ -122,7 +133,7 @@ export function RelatoriosPage() {
                 </SelectContent>
               </Select>
               
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => window.print()}>
                 <Printer className="h-4 w-4 mr-2" />
                 Imprimir
               </Button>
@@ -227,10 +238,7 @@ export function RelatoriosPage() {
                         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                         <XAxis 
                           dataKey="date" 
-                          tickFormatter={(value) => {
-                            const date = new Date(value);
-                            return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-                          }}
+                          tickFormatter={formatDay}
                           className="text-muted-foreground"
                         />
                         <YAxis 
@@ -246,11 +254,11 @@ export function RelatoriosPage() {
                           className="text-muted-foreground"
                         />
                         <Tooltip 
-                          formatter={(value: any, name: string) => {
-                            if (name === 'sales') return [`R$ ${Number(value).toLocaleString('pt-BR')}`, 'Vendas'];
+                          formatter={(value: number | string, name: string) => {
+                            if (name === 'Vendas') return [formatCurrency(Number(value)), 'Vendas'];
                             return [value, 'Pedidos'];
                           }}
-                          labelFormatter={(value) => `Data: ${new Date(value).toLocaleDateString('pt-BR')}`}
+                          labelFormatter={(value) => `Data: ${formatDay(String(value))}`}
                         />
                         <Legend />
                         <Line 
@@ -282,6 +290,11 @@ export function RelatoriosPage() {
                   <CardTitle>Produtos Mais Vendidos</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {!salesReport?.topProducts.length ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      Nenhuma venda paga neste período.
+                    </p>
+                  ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <Table>
@@ -317,18 +330,19 @@ export function RelatoriosPage() {
                             nameKey="name"
                             label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                           >
-                            {salesReport?.topProducts.map((entry, index) => (
+                            {salesReport?.topProducts.map((_, index) => (
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
                           <Tooltip 
-                            formatter={(value: any) => formatCurrency(value)}
+                            formatter={(value: number | string) => formatCurrency(Number(value))}
                           />
                           <Legend />
                         </PieChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -342,7 +356,7 @@ export function RelatoriosPage() {
                       <div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">Total de Visitantes</p>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {conversionReport?.totalVisitors.toLocaleString('pt-BR')}
+                          {(conversionReport?.totalVisitors ?? 0).toLocaleString('pt-BR')}
                         </p>
                       </div>
                       <Users className="h-8 w-8 text-blue-600" />
@@ -356,7 +370,7 @@ export function RelatoriosPage() {
                       <div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">Conversões</p>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {conversionReport?.totalConversions.toLocaleString('pt-BR')}
+                          {(conversionReport?.totalConversions ?? 0).toLocaleString('pt-BR')}
                         </p>
                       </div>
                       <ShoppingBag className="h-8 w-8 text-green-600" />
@@ -370,7 +384,7 @@ export function RelatoriosPage() {
                       <div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">Taxa de Conversão</p>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {conversionReport?.conversionRate.toFixed(1)}%
+                          {(conversionReport?.conversionRate ?? 0).toFixed(1)}%
                         </p>
                       </div>
                       <Percent className="h-8 w-8 text-purple-600" />
@@ -406,6 +420,11 @@ export function RelatoriosPage() {
                   <CardTitle>Funil de Conversão</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {!conversionReport?.totalVisitors ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      Nenhuma visita registrada neste período.
+                    </p>
+                  ) : (
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
@@ -421,8 +440,8 @@ export function RelatoriosPage() {
                           width={150}
                         />
                         <Tooltip 
-                          formatter={(value: any, name: string, props: any) => {
-                            if (name === 'visitors') return [value.toLocaleString('pt-BR'), 'Visitantes'];
+                          formatter={(value: number | string, name: string) => {
+                            if (name === 'Visitantes') return [Number(value).toLocaleString('pt-BR'), 'Visitantes'];
                             return [`${value}%`, 'Taxa de Conversão'];
                           }}
                         />
@@ -442,6 +461,7 @@ export function RelatoriosPage() {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -451,6 +471,11 @@ export function RelatoriosPage() {
                   <CardTitle>Conversão por Origem</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {!conversionReport?.totalVisitors ? (
+                    <p className="text-sm text-muted-foreground py-8 text-center">
+                      Nenhuma visita registrada neste período.
+                    </p>
+                  ) : (
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
@@ -480,6 +505,7 @@ export function RelatoriosPage() {
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -493,7 +519,7 @@ export function RelatoriosPage() {
                       <div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">Visitantes Totais</p>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {funnelReport?.totalVisitors.toLocaleString('pt-BR')}
+                          {(funnelReport?.totalVisitors ?? 0).toLocaleString('pt-BR')}
                         </p>
                       </div>
                       <Users className="h-8 w-8 text-blue-600" />
@@ -507,7 +533,7 @@ export function RelatoriosPage() {
                       <div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">Conversões Finais</p>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {funnelReport?.finalConversions.toLocaleString('pt-BR')}
+                          {(funnelReport?.finalConversions ?? 0).toLocaleString('pt-BR')}
                         </p>
                       </div>
                       <Target className="h-8 w-8 text-green-600" />
@@ -521,7 +547,7 @@ export function RelatoriosPage() {
                       <div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">Taxa de Conversão</p>
                         <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {funnelReport?.overallConversionRate.toFixed(1)}%
+                          {(funnelReport?.overallConversionRate ?? 0).toFixed(1)}%
                         </p>
                       </div>
                       <Percent className="h-8 w-8 text-purple-600" />
@@ -560,7 +586,7 @@ export function RelatoriosPage() {
                             <span className="text-xs font-medium text-gray-900 dark:text-white">
                               {step.conversionRate.toFixed(1)}%
                             </span>
-                            {index < funnelReport.steps.length - 1 && (
+                            {index > 0 && step.dropoffRate > 0 && (
                               <div className="flex items-center gap-1 text-xs">
                                 <span className="text-red-600 dark:text-red-400">
                                   -{step.dropoffRate.toFixed(1)}%
@@ -594,58 +620,31 @@ export function RelatoriosPage() {
                   <CardTitle>Sugestões de Melhoria</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {suggestions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">
+                      Ainda não há dados de navegação suficientes neste período para gerar sugestões.
+                    </p>
+                  ) : (
                   <div className="space-y-4">
-                    <div className="p-4 border rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 bg-yellow-100 text-yellow-800 rounded-full">
-                          <TrendingUp className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white mb-1">
-                            Otimize a página de produto
-                          </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Há uma queda significativa (65.5%) entre a visualização do produto e a adição ao carrinho. 
-                            Considere melhorar as descrições, adicionar mais fotos e destacar avaliações positivas.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4 border rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 bg-blue-100 text-blue-800 rounded-full">
-                          <Target className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white mb-1">
-                            Simplifique o checkout
-                          </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            62% dos usuários abandonam o processo durante o checkout. Considere implementar 
-                            um checkout em uma única página ou reduzir o número de campos obrigatórios.
-                          </p>
+                    {suggestions.map((sug) => (
+                      <div key={sug.index} className="p-4 border rounded-lg">
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-full ${sug.color}`}>
+                            <sug.icon className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-medium text-gray-900 dark:text-white mb-1">
+                              {sug.title}
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {sug.text(funnelReport!.steps[sug.index].dropoffRate.toFixed(1))}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="p-4 border rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 bg-green-100 text-green-800 rounded-full">
-                          <DollarSign className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white mb-1">
-                            Ofereça cupons de abandono
-                          </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Implemente emails automáticos com cupons de desconto para usuários que 
-                            abandonaram o carrinho. Isso pode aumentar sua taxa de recuperação em até 15%.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

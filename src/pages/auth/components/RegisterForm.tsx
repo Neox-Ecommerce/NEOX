@@ -63,12 +63,11 @@ export function RegisterForm({ onEntrepreneurRegistration }: RegisterFormProps) 
     if (Object.keys(newErrors).length === 0) {
       setIsLoading(true);
       try {
-        // Prepare user data - always register as CLIENTE
+        // cadastro público é sempre de CLIENTE; empreendedor usa o fluxo próprio
         const userData = {
           name: formData.fullName,
           email: formData.email,
-          role: 'CLIENTE' as const,
-          phone: ''
+          password: formData.password,
         };
         
         await registerUser(userData);
@@ -78,8 +77,8 @@ export function RegisterForm({ onEntrepreneurRegistration }: RegisterFormProps) 
         // Redirect to client dashboard
         navigate('/cliente');
         
-      } catch (error: any) {
-        FeedbackService.error(error.message || 'Erro ao criar conta');
+      } catch (error) {
+        FeedbackService.error(error instanceof Error ? error.message : 'Erro ao criar conta');
       } finally {
         setIsLoading(false);
       }

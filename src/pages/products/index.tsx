@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   Table, 
@@ -42,7 +41,6 @@ export function ProductsPage() {
     return (localStorage.getItem('products-view-mode') as 'grid' | 'table') || 'grid';
   });
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
-  const [showBulkActions, setShowBulkActions] = useState(false);
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -51,12 +49,12 @@ export function ProductsPage() {
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products', user?.lojaId],
-    queryFn: () => ProductService.getMyProducts(user?.lojaId || '1')
+    queryFn: () => ProductService.getMyProducts()
   });
 
   const { data: categoryCounts = {} } = useQuery({
     queryKey: ['category-counts', user?.lojaId],
-    queryFn: () => ProductService.getCategoryCounts(user?.lojaId || '1')
+    queryFn: () => ProductService.getCategoryCounts()
   });
 
   const deleteMutation = useMutation({
@@ -81,7 +79,6 @@ export function ProductsPage() {
       queryClient.invalidateQueries({ queryKey: ['product-stats'] });
       FeedbackService.success('Produtos excluídos com sucesso!');
       setSelectedProducts([]);
-      setShowBulkActions(false);
     },
     onError: () => {
       FeedbackService.error('Erro ao excluir produtos');
@@ -108,7 +105,6 @@ export function ProductsPage() {
       queryClient.invalidateQueries({ queryKey: ['product-stats'] });
       FeedbackService.success('Status dos produtos atualizado!');
       setSelectedProducts([]);
-      setShowBulkActions(false);
     },
     onError: () => {
       FeedbackService.error('Erro ao atualizar status dos produtos');

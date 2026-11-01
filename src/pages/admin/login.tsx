@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Store, Eye, EyeOff, Loader2, Shield } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,8 +31,8 @@ export function AdminLoginPage() {
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: 'admin@neoxstore.com',
-      password: '123456'
+      email: '',
+      password: ''
     }
   });
 
@@ -59,7 +59,7 @@ export function AdminLoginPage() {
       
       FeedbackService.success('Login realizado com sucesso!');
       navigate('/admin/lojas');
-    } catch (error) {
+    } catch {
       FeedbackService.error('Credenciais inválidas');
     } finally {
       setIsLoading(false);
@@ -148,17 +148,6 @@ export function AdminLoginPage() {
                 )}
               </Button>
             </form>
-
-            {/* Demo Credentials */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium text-gray-700 mb-2">
-                Credenciais de demonstração:
-              </p>
-              <div className="text-sm text-gray-600 space-y-1">
-                <p><strong>Email:</strong> admin@neoxstore.com</p>
-                <p><strong>Senha:</strong> 123456</p>
-              </div>
-            </div>
 
             <div className="mt-6 text-center">
               <Button 

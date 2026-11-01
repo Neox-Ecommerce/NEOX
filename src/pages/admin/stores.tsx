@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Store, 
@@ -7,24 +7,21 @@ import {
   X, 
   Search, 
   Filter,
-  Download,
   AlertTriangle,
   Ban,
   MessageSquare,
   Mail,
   Phone,
   FileText,
-  User,
   LogOut,
   ChevronDown,
   Shield,
   ShoppingBag,
-  Flag,
   Video
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -52,40 +49,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RoleGuard } from '@/components/RoleGuard';
 import { FeedbackService } from '@/services/FeedbackService';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
-
-interface Store {
-  id: string;
-  nomeFantasia: string;
-  razaoSocial: string;
-  cnpj: string;
-  email: string;
-  status: 'PENDENTE' | 'APROVADA' | 'REJEITADA' | 'SUSPENSA';
-  createdAt: Date;
-  owner: string;
-  documentos?: Array<{
-    id: string;
-    tipo: string;
-    url: string;
-    dataEnvio: Date;
-    status: 'PENDENTE' | 'VERIFICADO' | 'REJEITADO';
-  }>;
-  advertencias?: Array<{
-    id: string;
-    motivo: string;
-    data: Date;
-    resolvido: boolean;
-  }>;
-}
+import { AdminService, AdminStore, StoreStatus } from '@/services/AdminService';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 
 export function AdminStoresPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [selectedStore, setSelectedStore] = useState<AdminStore | null>(null);
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'suspend' | 'warn' | null>(null);
   const [actionReason, setActionReason] = useState('');
   const [actionModalOpen, setActionModalOpen] = useState(false);
@@ -97,120 +71,31 @@ export function AdminStoresPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Mock data - em produção viria de uma API
-  const stores: Store[] = [
-    {
-      id: '1',
-      nomeFantasia: 'TechStore Premium',
-      razaoSocial: 'TechStore Premium Comércio de Eletrônicos LTDA',
-      cnpj: '12.345.678/0001-90',
-      email: 'lojista@neoxstore.com',
-      status: 'APROVADA',
-      createdAt: new Date('2024-01-15'),
-      owner: 'João Silva',
-      documentos: [
-        {
-          id: 'doc1',
-          tipo: 'Cartão CNPJ',
-          url: 'https://example.com/doc1.pdf',
-          dataEnvio: new Date('2024-01-14'),
-          status: 'VERIFICADO'
-        },
-        {
-          id: 'doc2',
-          tipo: 'Contrato Social',
-          url: 'https://example.com/doc2.pdf',
-          dataEnvio: new Date('2024-01-14'),
-          status: 'VERIFICADO'
-        }
-      ]
-    },
-    {
-      id: '2',
-      nomeFantasia: 'Moda & Estilo',
-      razaoSocial: 'Moda e Estilo Confecções LTDA',
-      cnpj: '98.765.432/0001-10',
-      email: 'contato@modaestilo.com',
-      status: 'PENDENTE',
-      createdAt: new Date('2024-01-20'),
-      owner: 'Maria Santos',
-      documentos: [
-        {
-          id: 'doc3',
-          tipo: 'Cartão CNPJ',
-          url: 'https://example.com/doc3.pdf',
-          dataEnvio: new Date('2024-01-20'),
-          status: 'PENDENTE'
-        }
-      ]
-    },
-    {
-      id: '3',
-      nomeFantasia: 'Casa & Decoração',
-      razaoSocial: 'Casa e Decoração Móveis LTDA',
-      cnpj: '11.222.333/0001-44',
-      email: 'vendas@casadecor.com',
-      status: 'PENDENTE',
-      createdAt: new Date('2024-01-22'),
-      owner: 'Pedro Costa',
-      documentos: [
-        {
-          id: 'doc4',
-          tipo: 'Cartão CNPJ',
-          url: 'https://example.com/doc4.pdf',
-          dataEnvio: new Date('2024-01-22'),
-          status: 'PENDENTE'
-        },
-        {
-          id: 'doc5',
-          tipo: 'Contrato Social',
-          url: 'https://example.com/doc5.pdf',
-          dataEnvio: new Date('2024-01-22'),
-          status: 'PENDENTE'
-        }
-      ]
-    },
-    {
-      id: '4',
-      nomeFantasia: 'Esporte Total',
-      razaoSocial: 'Esporte Total Artigos Esportivos LTDA',
-      cnpj: '44.333.222/0001-11',
-      email: 'contato@esportetotal.com',
-      status: 'SUSPENSA',
-      createdAt: new Date('2023-12-10'),
-      owner: 'Ana Oliveira',
-      documentos: [
-        {
-          id: 'doc6',
-          tipo: 'Cartão CNPJ',
-          url: 'https://example.com/doc6.pdf',
-          dataEnvio: new Date('2023-12-09'),
-          status: 'VERIFICADO'
-        }
-      ],
-      advertencias: [
-        {
-          id: 'adv1',
-          motivo: 'Venda de produtos falsificados',
-          data: new Date('2024-01-05'),
-          resolvido: false
-        },
-        {
-          id: 'adv2',
-          motivo: 'Publicação de conteúdo inadequado',
-          data: new Date('2023-12-20'),
-          resolvido: true
-        }
-      ]
+  // Filtros aplicados no cliente sobre a lista completa (os cards de resumo usam o total)
+  const { data: storesData, isLoading, isError } = useQuery({
+    queryKey: ['admin-stores'],
+    queryFn: () => AdminService.getStores(),
+  });
+  const stores = storesData ?? [];
+
+  // mantém o modal de detalhes em sincronia após ações (documentos, status)
+  useEffect(() => {
+    setSelectedStore((prev) => (prev && storesData?.find((s) => s.id === prev.id)) || prev);
+  }, [storesData]);
+
+  // /admin/lojas?storeId=... (link "Ver Loja" da tela de vídeos) abre os detalhes da loja
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const target = searchParams.get('storeId') && storesData?.find((s) => s.id === searchParams.get('storeId'));
+    if (target) {
+      setSelectedStore(target);
+      setStoreDetailsOpen(true);
+      setSearchParams({}, { replace: true });
     }
-  ];
+  }, [storesData, searchParams, setSearchParams]);
 
   const updateStoreMutation = useMutation({
-    mutationFn: async ({ storeId, status, reason }: { storeId: string; status: string; reason?: string }) => {
-      // Simular API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return { storeId, status, reason };
-    },
+    mutationFn: AdminService.updateStoreStatus,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
       FeedbackService.success(`Loja ${data.status.toLowerCase()} com sucesso!`);
@@ -219,17 +104,13 @@ export function AdminStoresPage() {
       setActionModalOpen(false);
       setActionReason('');
     },
-    onError: () => {
-      FeedbackService.error('Erro ao atualizar status da loja');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao atualizar status da loja');
     }
   });
 
   const addWarningMutation = useMutation({
-    mutationFn: async ({ storeId, reason }: { storeId: string; reason: string }) => {
-      // Simular API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return { storeId, reason };
-    },
+    mutationFn: AdminService.addWarning,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
       FeedbackService.success('Advertência enviada com sucesso!');
@@ -238,12 +119,23 @@ export function AdminStoresPage() {
       setActionModalOpen(false);
       setActionReason('');
     },
-    onError: () => {
-      FeedbackService.error('Erro ao enviar advertência');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao enviar advertência');
     }
   });
 
-  const handleAction = (store: Store, action: 'approve' | 'reject' | 'suspend' | 'warn') => {
+  const documentMutation = useMutation({
+    mutationFn: AdminService.updateDocumentStatus,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
+      FeedbackService.success('Documento atualizado!');
+    },
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao atualizar documento');
+    }
+  });
+
+  const handleAction = (store: AdminStore, action: 'approve' | 'reject' | 'suspend' | 'warn') => {
     setSelectedStore(store);
     setActionType(action);
     setActionModalOpen(true);
@@ -260,12 +152,12 @@ export function AdminStoresPage() {
       
       addWarningMutation.mutate({
         storeId: selectedStore.id,
-        reason: actionReason
+        motivo: actionReason
       });
       return;
     }
 
-    const statusMap = {
+    const statusMap: Record<'approve' | 'reject' | 'suspend', StoreStatus> = {
       approve: 'APROVADA',
       reject: 'REJEITADA',
       suspend: 'SUSPENSA'
@@ -283,7 +175,7 @@ export function AdminStoresPage() {
     });
   };
 
-  const handleViewStore = (store: Store) => {
+  const handleViewStore = (store: AdminStore) => {
     setSelectedStore(store);
     setStoreDetailsOpen(true);
   };
@@ -326,7 +218,8 @@ export function AdminStoresPage() {
       store.nomeFantasia.toLowerCase().includes(searchQuery.toLowerCase()) ||
       store.razaoSocial.toLowerCase().includes(searchQuery.toLowerCase()) ||
       store.cnpj.includes(searchQuery) ||
-      store.owner.toLowerCase().includes(searchQuery.toLowerCase());
+      store.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      store.email.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === 'all' || store.status === statusFilter;
 
@@ -549,6 +442,13 @@ export function AdminStoresPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {(isLoading || isError || filteredStores.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                        {isLoading ? 'Carregando lojas...' : isError ? 'Erro ao carregar lojas' : 'Nenhuma loja encontrada'}
+                      </TableCell>
+                    </TableRow>
+                  )}
                   {filteredStores.map((store) => (
                     <TableRow key={store.id}>
                       <TableCell>
@@ -657,6 +557,13 @@ export function AdminStoresPage() {
                         <div>
                           <p className="text-sm font-medium text-gray-500">Status</p>
                           <div className="mt-1">{getStatusBadge(selectedStore.status)}</div>
+                          {selectedStore.statusReason && (
+                            <p className="text-sm text-gray-500 mt-1">Motivo: {selectedStore.statusReason}</p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">CNPJ verificado</p>
+                          <p className="font-medium">{selectedStore.cnpjVerificado ? 'Sim' : 'Não'}</p>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-500">Data de Criação</p>
@@ -678,24 +585,32 @@ export function AdminStoresPage() {
                           <p className="text-sm font-medium text-gray-500">Email</p>
                           <div className="flex items-center gap-2">
                             <p className="font-medium">{selectedStore.email}</p>
-                            <Button variant="ghost" size="icon" className="h-6 w-6">
-                              <Mail className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                              <a href={`mailto:${selectedStore.email}`} aria-label="Enviar email">
+                                <Mail className="h-4 w-4" />
+                              </a>
                             </Button>
                           </div>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-500">Telefone</p>
                           <div className="flex items-center gap-2">
-                            <p className="font-medium">(11) 99999-9999</p>
-                            <Button variant="ghost" size="icon" className="h-6 w-6">
-                              <Phone className="h-4 w-4" />
-                            </Button>
+                            <p className="font-medium">{selectedStore.telefone || 'Não informado'}</p>
+                            {selectedStore.telefone && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                                <a href={`tel:${selectedStore.telefone}`} aria-label="Ligar">
+                                  <Phone className="h-4 w-4" />
+                                </a>
+                              </Button>
+                            )}
                           </div>
                         </div>
                         <div className="pt-2">
-                          <Button variant="outline" size="sm">
-                            <MessageSquare className="h-4 w-4 mr-2" />
-                            Enviar Mensagem
+                          <Button variant="outline" size="sm" asChild>
+                            <a href={`mailto:${selectedStore.email}`}>
+                              <MessageSquare className="h-4 w-4 mr-2" />
+                              Enviar Mensagem
+                            </a>
                           </Button>
                         </div>
                       </CardContent>
@@ -709,7 +624,10 @@ export function AdminStoresPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {selectedStore.documentos?.map((doc) => (
+                        {selectedStore.documentos.length === 0 && (
+                          <p className="text-sm text-gray-500">Nenhum documento enviado</p>
+                        )}
+                        {selectedStore.documentos.map((doc) => (
                           <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
                             <div className="flex items-center gap-3">
                               <FileText className="h-5 w-5 text-gray-400" />
@@ -722,6 +640,30 @@ export function AdminStoresPage() {
                             </div>
                             <div className="flex items-center gap-2">
                               {getDocumentStatusBadge(doc.status)}
+                              {doc.status !== 'VERIFICADO' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-green-600"
+                                  disabled={documentMutation.isPending}
+                                  onClick={() => documentMutation.mutate({ documentId: doc.id, status: 'VERIFICADO' })}
+                                >
+                                  <Check className="h-4 w-4 mr-1" />
+                                  Verificar
+                                </Button>
+                              )}
+                              {doc.status === 'PENDENTE' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600"
+                                  disabled={documentMutation.isPending}
+                                  onClick={() => documentMutation.mutate({ documentId: doc.id, status: 'REJEITADO' })}
+                                >
+                                  <X className="h-4 w-4 mr-1" />
+                                  Rejeitar
+                                </Button>
+                              )}
                               <Button variant="outline" size="sm" onClick={() => window.open(doc.url, '_blank')}>
                                 <Eye className="h-4 w-4 mr-2" />
                                 Visualizar
@@ -734,7 +676,7 @@ export function AdminStoresPage() {
                   </Card>
 
                   {/* Warnings */}
-                  {selectedStore.advertencias && selectedStore.advertencias.length > 0 && (
+                  {selectedStore.advertencias.length > 0 && (
                     <Card className="border-yellow-200 bg-yellow-50">
                       <CardHeader>
                         <CardTitle className="text-base flex items-center gap-2 text-yellow-800">
@@ -863,9 +805,8 @@ export function AdminStoresPage() {
                             Informações sobre advertências
                           </p>
                           <ul className="text-sm text-yellow-700 mt-1 space-y-1 list-disc list-inside">
-                            <li>A loja receberá uma notificação por email</li>
+                            <li>A advertência fica registrada no cadastro da loja</li>
                             <li>Múltiplas advertências podem resultar em suspensão</li>
-                            <li>A loja terá 7 dias para resolver o problema</li>
                           </ul>
                         </div>
                       </div>

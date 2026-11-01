@@ -1,7 +1,6 @@
 import CountUp from 'react-countup';
 import { Card, CardContent } from '@/components/ui/card';
-import { DivideIcon as LucideIcon } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import type { LucideIcon } from 'lucide-react';
 
 interface MetricCardProps {
   title: string;
@@ -26,17 +25,6 @@ export function MetricCard({
     if (delta > 0) return 'text-green-600 dark:text-green-400';
     if (delta < 0) return 'text-red-600 dark:text-red-400';
     return 'text-gray-500 dark:text-gray-400';
-  };
-
-  const formatValue = (val: number) => {
-    switch (format) {
-      case 'currency':
-        return formatCurrency(val);
-      case 'percentage':
-        return `${val.toFixed(1)}%`;
-      default:
-        return val.toString();
-    }
   };
 
   return (

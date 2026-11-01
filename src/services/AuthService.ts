@@ -1,3 +1,5 @@
+import { api, tokenStore } from '@/lib/api';
+
 export interface User {
   id: string;
   name: string;
@@ -8,140 +10,67 @@ export interface User {
   lojaId?: string;
 }
 
-export class AuthService {
-  private static STORAGE_KEY = 'neoxstore_user';
-  private static USERS_KEY = 'neoxstore_users';
-
-  private static getUsers(): User[] {
-    const stored = localStorage.getItem(this.USERS_KEY);
-    if (stored) {
-      return JSON.parse(stored);
-    }
-    
-    // Seed inicial
-    const seedUsers: User[] = [
-      {
-        id: '1',
-        name: 'Administrador',
-        email: 'admin@neoxstore.com',
-        role: 'ADMIN',
-        phone: '(11) 99999-0001'
-      },
-      {
-        id: '2',
-        name: 'João Silva',
-        email: 'lojista@neoxstore.com',
-        role: 'EMPREENDEDOR',
-        phone: '(11) 99999-0002',
-        lojaId: '1'
-      },
-      {
-        id: '3',
-        name: 'Maria Santos',
-        email: 'cliente@neoxstore.com',
-        role: 'CLIENTE',
-        phone: '(11) 99999-0003'
-      }
-    ];
-    
-    localStorage.setItem(this.USERS_KEY, JSON.stringify(seedUsers));
-    return seedUsers;
-  }
-
-  static async login(email: string, password: string): Promise<User> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const users = this.getUsers();
-    const user = users.find(u => u.email === email);
-    
-    if (!user || password !== '123456') {
-      throw new Error('Credenciais inválidas');
-    }
-    
-    // Ensure user has a role property
-    const userWithRole: User = {
-      ...user,
-      role: user.role || 'CLIENTE' // Default to CLIENTE if no role
-    };
-    
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(userWithRole));
-    return userWithRole;
-  }
-
-  static logout(): void {
-    localStorage.removeItem(this.STORAGE_KEY);
-  }
-
-  static getCurrentUser(): User | null {
-    const stored = localStorage.getItem(this.STORAGE_KEY);
-    if (!stored) return null;
-    
-    const user = JSON.parse(stored);
-    
-    // Ensure user has a role property
-    return {
-      ...user,
-      role: user.role || 'CLIENTE'
-    };
-  }
-
-  static async register(userData: Omit<User, 'id'>): Promise<User> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const users = this.getUsers();
-    const existingUser = users.find(u => u.email === userData.email);
-    
-    if (existingUser) {
-      throw new Error('Email já cadastrado');
-    }
-    
-    const newUser: User = {
-      ...userData,
-      id: Date.now().toString(),
-      role: userData.role || 'CLIENTE' // Ensure role is set
-    };
-    
-    users.push(newUser);
-    localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(newUser));
-    
-    return newUser;
-  }
-
-  static async updateProfile(userId: string, data: Partial<User>): Promise<User> {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const users = this.getUsers();
-    const index = users.findIndex(u => u.id === userId);
-    
-    if (index === -1) {
-      throw new Error('Usuário não encontrado');
-    }
-    
-    users[index] = { 
-      ...users[index], 
-      ...data,
-      role: data.role || users[index].role || 'CLIENTE' // Ensure role is preserved
-    };
-    localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
-    
-    // Atualizar usuário logado se for o mesmo
-    const currentUser = this.getCurrentUser();
-    if (currentUser && currentUser.id === userId) {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(users[index]));
-    }
-    
-    return users[index];
-  }
-
-  static async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (currentPassword !== '123456') {
-      throw new Error('Senha atual incorreta');
-    }
-    
-    // Em uma implementação real, aqui salvaria a nova senha hasheada
-    console.log('Senha alterada com sucesso');
-  }
+export interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
 }
+
+export interface StoreRegisterData extends RegisterData {
+  storeName: string;
+  cnpj: string;
+  companyName: string;
+  document: File | null;
+}
+
+interface AuthResponse {
+  accessToken: string;
+  user: User;
+}
+
+function startSession(res: AuthResponse): User {
+  tokenStore.set(res.accessToken);
+  return res.user;
+}
+
+export const AuthService = {
+  async login(email: string, password: string): Promise<User> {
+    return startSession(await api<AuthResponse>('/auth/login', { method: 'POST', body: { email, password } }));
+  },
+
+  logout(): void {
+    tokenStore.clear();
+  },
+
+  /** Usuário da sessão atual (valida o token na API); null se não houver sessão. */
+  async getCurrentUser(): Promise<User | null> {
+    if (!tokenStore.get()) return null;
+    try {
+      return await api<User>('/auth/me');
+    } catch {
+      tokenStore.clear();
+      return null;
+    }
+  },
+
+  async register(data: RegisterData): Promise<User> {
+    return startSession(await api<AuthResponse>('/auth/register', { method: 'POST', body: data }));
+  },
+
+  async registerStore(data: StoreRegisterData): Promise<User> {
+    const form = new FormData();
+    Object.entries(data).forEach(([k, v]) => {
+      if (v !== null && v !== undefined && v !== '') form.append(k, v as string | Blob);
+    });
+    return startSession(await api<AuthResponse>('/auth/register-store', { method: 'POST', body: form }));
+  },
+
+  async updateProfile(data: Partial<User>): Promise<User> {
+    return api<User>('/auth/me', { method: 'PUT', body: data });
+  },
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await api('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } });
+  },
+};

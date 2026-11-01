@@ -1,31 +1,27 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  Video, 
-  Search, 
-  Filter, 
-  Flag, 
-  Eye, 
-  Ban, 
-  Play, 
-  Calendar, 
-  User, 
-  AlertTriangle, 
-  MoreHorizontal, 
+import {
+  Video,
+  Search,
+  Filter,
+  Flag,
+  Eye,
+  Ban,
+  Play,
+  AlertTriangle,
+  MoreHorizontal,
   ExternalLink,
-  Clock,
   Store,
   Mail,
   Shield,
   ShoppingBag,
   LogOut,
-  ChevronDown,
-  X
+  ChevronDown
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -45,31 +41,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RoleGuard } from '@/components/RoleGuard';
 import { FeedbackService } from '@/services/FeedbackService';
 import { useAuth } from '@/contexts/AuthContext';
-
-interface Video {
-  id: string;
-  title: string;
-  description: string;
-  thumbnailUrl: string;
-  videoUrl: string;
-  storeId: string;
-  storeName: string;
-  status: 'PUBLICADO' | 'REMOVIDO';
-  views: number;
-  likes: number;
-  reports: number;
-  createdAt: Date;
-  duration: number;
-}
+import { AdminService, AdminVideo } from '@/services/AdminService';
 
 export function AdminVideosPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<AdminVideo | null>(null);
   const [actionType, setActionType] = useState<'remove' | 'notify' | null>(null);
   const [videoDetailsOpen, setVideoDetailsOpen] = useState(false);
   const [actionModalOpen, setActionModalOpen] = useState(false);
@@ -81,105 +62,32 @@ export function AdminVideosPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  // Mock data para vídeos
-  const videos: Video[] = [
-    {
-      id: 'v1',
-      title: 'Unboxing iPhone 15 Pro Max - Vale a pena?',
-      description: 'Confira o unboxing completo do novo iPhone 15 Pro Max e descubra se vale a pena o investimento!',
-      thumbnailUrl: 'https://images.pexels.com/photos/607812/pexels-photo-607812.jpeg?auto=compress&cs=tinysrgb&w=400',
-      videoUrl: 'https://example.com/video1.mp4',
-      storeId: '1',
-      storeName: 'TechStore Premium',
-      status: 'PUBLICADO',
-      views: 12500,
-      likes: 890,
-      reports: 0,
-      createdAt: new Date('2024-01-20'),
-      duration: 45
-    },
-    {
-      id: 'v2',
-      title: 'MacBook Pro M3 vs M2 - Comparativo Completo',
-      description: 'Comparação detalhada entre o novo MacBook Pro M3 e o M2. Qual oferece melhor custo-benefício?',
-      thumbnailUrl: 'https://images.pexels.com/photos/205421/pexels-photo-205421.jpeg?auto=compress&cs=tinysrgb&w=400',
-      videoUrl: 'https://example.com/video2.mp4',
-      storeId: '1',
-      storeName: 'TechStore Premium',
-      status: 'PUBLICADO',
-      views: 8750,
-      likes: 654,
-      reports: 2,
-      createdAt: new Date('2024-01-18'),
-      duration: 38
-    },
-    {
-      id: 'v3',
-      title: 'Tênis Nike Falsificado - Comparativo com Original',
-      description: 'Mostrando as diferenças entre um tênis Nike original e uma réplica. Cuidado com as falsificações!',
-      thumbnailUrl: 'https://images.pexels.com/photos/2529148/pexels-photo-2529148.jpeg?auto=compress&cs=tinysrgb&w=400',
-      videoUrl: 'https://example.com/video3.mp4',
-      storeId: '4',
-      storeName: 'Esporte Total',
-      status: 'REMOVIDO',
-      views: 5420,
-      likes: 412,
-      reports: 25,
-      createdAt: new Date('2024-01-05'),
-      duration: 28
-    },
-    {
-      id: 'v4',
-      title: 'Novos Produtos da Moda & Estilo - Coleção Verão',
-      description: 'Apresentando a nova coleção de verão da Moda & Estilo. Roupas leves e estilosas para o calor!',
-      thumbnailUrl: 'https://images.pexels.com/photos/934070/pexels-photo-934070.jpeg?auto=compress&cs=tinysrgb&w=400',
-      videoUrl: 'https://example.com/video4.mp4',
-      storeId: '2',
-      storeName: 'Moda & Estilo',
-      status: 'PUBLICADO',
-      views: 3200,
-      likes: 245,
-      reports: 0,
-      createdAt: new Date('2024-01-22'),
-      duration: 32
-    },
-    {
-      id: 'v5',
-      title: 'Dicas de Decoração para Apartamentos Pequenos',
-      description: 'Aprenda como otimizar espaços pequenos com dicas de decoração práticas e econômicas.',
-      thumbnailUrl: 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=400',
-      videoUrl: 'https://example.com/video5.mp4',
-      storeId: '3',
-      storeName: 'Casa & Decoração',
-      status: 'PUBLICADO',
-      views: 4800,
-      likes: 320,
-      reports: 1,
-      createdAt: new Date('2024-01-21'),
-      duration: 40
-    }
-  ];
+  const { data: videosData, isLoading, isError } = useQuery({
+    queryKey: ['admin-videos'],
+    queryFn: () => AdminService.getVideos(),
+  });
+  const videos = videosData ?? [];
 
   const updateVideoMutation = useMutation({
-    mutationFn: async ({ videoId, action, reason }: { videoId: string; action: string; reason: string }) => {
-      // Simular API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return { videoId, action, reason };
-    },
-    onSuccess: (data) => {
+    mutationFn: ({ videoId, action, reason }: { videoId: string; action: 'remove' | 'notify'; reason: string }): Promise<unknown> =>
+      action === 'remove'
+        ? AdminService.removeVideo({ videoId, reason })
+        : AdminService.notifyVideoStore({ videoId, reason }),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-videos'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
       FeedbackService.success(`Ação realizada com sucesso!`);
       setSelectedVideo(null);
       setActionType(null);
       setActionModalOpen(false);
       setActionReason('');
     },
-    onError: () => {
-      FeedbackService.error('Erro ao processar ação');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao processar ação');
     }
   });
 
-  const handleVideoAction = (video: Video, action: 'remove' | 'notify') => {
+  const handleVideoAction = (video: AdminVideo, action: 'remove' | 'notify') => {
     setSelectedVideo(video);
     setActionType(action);
     setActionModalOpen(true);
@@ -198,18 +106,20 @@ export function AdminVideosPage() {
     });
   };
 
-  const handleViewVideo = (video: Video) => {
+  const handleViewVideo = (video: AdminVideo) => {
     setSelectedVideo(video);
     setVideoDetailsOpen(true);
   };
 
   const getVideoStatusBadge = (status: string) => {
     const variants = {
-      'PUBLICADO': { variant: 'success' as const, label: 'Publicado' },
-      'REMOVIDO': { variant: 'destructive' as const, label: 'Removido' }
+      'published': { variant: 'success' as const, label: 'Publicado' },
+      'processing': { variant: 'warning' as const, label: 'Processando' },
+      'rejected': { variant: 'destructive' as const, label: 'Rejeitado' },
+      'removed': { variant: 'destructive' as const, label: 'Removido' }
     };
 
-    const config = variants[status as keyof typeof variants] || variants.PUBLICADO;
+    const config = variants[status as keyof typeof variants] || variants.published;
 
     return (
       <Badge variant={config.variant}>
@@ -219,16 +129,16 @@ export function AdminVideosPage() {
   };
 
   const filteredVideos = videos.filter(video => {
-    const matchesSearch = searchQuery === '' || 
+    const matchesSearch = searchQuery === '' ||
       video.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       video.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       video.storeName.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || 
-      (statusFilter === 'PUBLICADO' && video.status === 'PUBLICADO') ||
-      (statusFilter === 'REMOVIDO' && video.status === 'REMOVIDO') ||
+
+    const matchesStatus = statusFilter === 'all' ||
+      (statusFilter === 'published' && video.status === 'published') ||
+      (statusFilter === 'removed' && video.status === 'removed') ||
       (statusFilter === 'reported' && video.reports > 0);
-    
+
     return matchesSearch && matchesStatus;
   });
 
@@ -259,7 +169,7 @@ export function AdminVideosPage() {
 
   const handleSwitchUser = (role: string) => {
     setUserSwitcherOpen(false);
-    
+
     if (role === 'admin') {
       // Already in admin
       return;
@@ -379,7 +289,7 @@ export function AdminVideosPage() {
                   <div>
                     <p className="text-sm text-gray-600">Publicados</p>
                     <p className="text-2xl font-bold text-green-600">
-                      {videos.filter(v => v.status === 'PUBLICADO').length}
+                      {videos.filter(v => v.status === 'published').length}
                     </p>
                   </div>
                   <Play className="h-8 w-8 text-green-600" />
@@ -427,7 +337,7 @@ export function AdminVideosPage() {
                 className="pl-10"
               />
             </div>
-            
+
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-48">
                 <Filter className="h-4 w-4 mr-2" />
@@ -435,22 +345,30 @@ export function AdminVideosPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os vídeos</SelectItem>
-                <SelectItem value="PUBLICADO">Publicados</SelectItem>
-                <SelectItem value="REMOVIDO">Removidos</SelectItem>
+                <SelectItem value="published">Publicados</SelectItem>
+                <SelectItem value="removed">Removidos</SelectItem>
                 <SelectItem value="reported">Com denúncias</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {/* Videos Grid */}
+          {(isLoading || isError || filteredVideos.length === 0) && (
+            <Card>
+              <CardContent className="p-12 text-center text-gray-500">
+                {isLoading ? 'Carregando vídeos...' : isError ? 'Erro ao carregar vídeos' : 'Nenhum vídeo encontrado'}
+              </CardContent>
+            </Card>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredVideos.map((video) => (
-              <Card key={video.id} className={video.status === 'REMOVIDO' ? 'opacity-60' : ''}>
+              <Card key={video.id} className={video.status === 'removed' ? 'opacity-60' : ''}>
                 <div className="relative">
-                  <img 
-                    src={video.thumbnailUrl} 
-                    alt={video.title}
-                    className="w-full h-48 object-cover rounded-t-lg"
+                  <video
+                    src={video.videoUrl}
+                    preload="metadata"
+                    muted
+                    className="w-full h-48 object-cover rounded-t-lg bg-black"
                   />
                   <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
                     {formatDuration(video.duration)}
@@ -468,7 +386,7 @@ export function AdminVideosPage() {
                 <CardContent className="p-4">
                   <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1">{video.title}</h3>
                   <p className="text-sm text-gray-500 mb-2">{video.storeName}</p>
-                  
+
                   <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
                     <div className="flex items-center gap-2">
                       <Eye className="h-4 w-4" />
@@ -478,18 +396,18 @@ export function AdminVideosPage() {
                       {new Date(video.createdAt).toLocaleDateString('pt-BR')}
                     </div>
                   </div>
-                  
+
                   <div className="flex justify-between">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       size="sm"
                       onClick={() => handleViewVideo(video)}
                     >
                       <Eye className="h-4 w-4 mr-2" />
                       Detalhes
                     </Button>
-                    
-                    {video.status === 'PUBLICADO' && (
+
+                    {video.status === 'published' && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button size="sm" variant="ghost">
@@ -497,12 +415,10 @@ export function AdminVideosPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {video.reports > 0 && (
-                            <DropdownMenuItem onClick={() => handleVideoAction(video, 'remove')}>
-                              <Ban className="h-4 w-4 mr-2 text-red-600" />
-                              Remover Vídeo
-                            </DropdownMenuItem>
-                          )}
+                          <DropdownMenuItem onClick={() => handleVideoAction(video, 'remove')}>
+                            <Ban className="h-4 w-4 mr-2 text-red-600" />
+                            Remover Vídeo
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleVideoAction(video, 'notify')}>
                             <Mail className="h-4 w-4 mr-2" />
                             Notificar Loja
@@ -538,20 +454,12 @@ export function AdminVideosPage() {
                   <div className="space-y-6">
                     {/* Video Preview */}
                     <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                      <img 
-                        src={selectedVideo.thumbnailUrl} 
-                        alt={selectedVideo.title}
-                        className="w-full h-full object-cover"
+                      <video
+                        src={selectedVideo.videoUrl}
+                        preload="metadata"
+                        controls
+                        className="w-full h-full object-contain"
                       />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Button 
-                          size="icon" 
-                          className="rounded-full bg-white/20 backdrop-blur-sm hover:bg-white/30 h-16 w-16"
-                          onClick={() => window.open(selectedVideo.videoUrl, '_blank')}
-                        >
-                          <Play className="h-8 w-8 text-white" />
-                        </Button>
-                      </div>
                     </div>
 
                     {/* Video Info */}
@@ -572,6 +480,9 @@ export function AdminVideosPage() {
                           <div>
                             <p className="text-sm font-medium text-gray-500">Status</p>
                             <div className="mt-1">{getVideoStatusBadge(selectedVideo.status)}</div>
+                            {selectedVideo.moderationReason && (
+                              <p className="text-sm text-gray-500 mt-1">Motivo: {selectedVideo.moderationReason}</p>
+                            )}
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-500">Data de Publicação</p>
@@ -606,8 +517,8 @@ export function AdminVideosPage() {
                             <p className="font-medium text-red-600">{selectedVideo.reports}</p>
                           </div>
                           <div>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               onClick={() => navigate(`/admin/lojas?storeId=${selectedVideo.storeId}`)}
                             >
@@ -629,53 +540,9 @@ export function AdminVideosPage() {
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <div className="space-y-4">
-                            <div className="p-4 border border-red-200 rounded-lg bg-white">
-                              <div className="flex items-start gap-3">
-                                <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
-                                <div>
-                                  <p className="font-medium">Conteúdo inadequado ou ilegal</p>
-                                  <p className="text-sm text-gray-600 mt-1">
-                                    Este vídeo parece mostrar produtos falsificados e incentiva a compra de itens ilegais.
-                                  </p>
-                                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                                    <div className="flex items-center gap-1">
-                                      <Calendar className="h-4 w-4" />
-                                      {new Date('2024-01-10').toLocaleDateString('pt-BR')}
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <User className="h-4 w-4" />
-                                      Usuário anônimo
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {selectedVideo.reports > 1 && (
-                              <div className="p-4 border border-red-200 rounded-lg bg-white">
-                                <div className="flex items-start gap-3">
-                                  <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
-                                  <div>
-                                    <p className="font-medium">Violação de direitos autorais</p>
-                                    <p className="text-sm text-gray-600 mt-1">
-                                      O vídeo utiliza material protegido por direitos autorais sem permissão.
-                                    </p>
-                                    <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                                      <div className="flex items-center gap-1">
-                                        <Calendar className="h-4 w-4" />
-                                        {new Date('2024-01-12').toLocaleDateString('pt-BR')}
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <User className="h-4 w-4" />
-                                        Nike Brasil
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                          <p className="text-sm text-red-700">
+                            Este vídeo recebeu {selectedVideo.reports} denúncia(s) de usuários. Avalie o conteúdo e, se necessário, remova o vídeo ou notifique a loja.
+                          </p>
                         </CardContent>
                       </Card>
                     )}
@@ -685,21 +552,19 @@ export function AdminVideosPage() {
                       <Button variant="outline" onClick={() => setVideoDetailsOpen(false)}>
                         Fechar
                       </Button>
-                      {selectedVideo.status === 'PUBLICADO' && (
+                      {selectedVideo.status === 'published' && (
                         <>
-                          {selectedVideo.reports > 0 && (
-                            <Button 
-                              variant="destructive"
-                              onClick={() => {
-                                setVideoDetailsOpen(false);
-                                handleVideoAction(selectedVideo, 'remove');
-                              }}
-                            >
-                              <Ban className="h-4 w-4 mr-2" />
-                              Remover Vídeo
-                            </Button>
-                          )}
-                          <Button 
+                          <Button
+                            variant="destructive"
+                            onClick={() => {
+                              setVideoDetailsOpen(false);
+                              handleVideoAction(selectedVideo, 'remove');
+                            }}
+                          >
+                            <Ban className="h-4 w-4 mr-2" />
+                            Remover Vídeo
+                          </Button>
+                          <Button
                             variant="outline"
                             onClick={() => {
                               setVideoDetailsOpen(false);
@@ -757,8 +622,8 @@ export function AdminVideosPage() {
                           Atenção: Remoção de conteúdo
                         </p>
                         <ul className="text-sm text-red-700 mt-1 space-y-1 list-disc list-inside">
-                          <li>O vídeo será removido permanentemente da plataforma</li>
-                          <li>A loja será notificada sobre a remoção e o motivo</li>
+                          <li>O vídeo deixará de ser exibido na plataforma</li>
+                          <li>Uma advertência com o motivo será registrada para a loja</li>
                           <li>Múltiplas violações podem resultar em suspensão da loja</li>
                         </ul>
                       </div>
@@ -775,9 +640,8 @@ export function AdminVideosPage() {
                           Informações sobre notificações
                         </p>
                         <ul className="text-sm text-yellow-700 mt-1 space-y-1 list-disc list-inside">
-                          <li>A loja receberá um email com o motivo da notificação</li>
+                          <li>A notificação fica registrada como advertência no cadastro da loja</li>
                           <li>O vídeo permanecerá publicado</li>
-                          <li>A loja terá 48 horas para resolver o problema</li>
                         </ul>
                       </div>
                     </div>
@@ -792,13 +656,13 @@ export function AdminVideosPage() {
                 }}>
                   Cancelar
                 </Button>
-                <Button 
+                <Button
                   onClick={confirmAction}
-                  disabled={!actionReason}
+                  disabled={!actionReason.trim() || updateVideoMutation.isPending}
                   variant={actionType === 'notify' ? 'default' : 'destructive'}
                 >
                   {updateVideoMutation.isPending
-                    ? 'Processando...' 
+                    ? 'Processando...'
                     : actionType === 'remove' ? 'Remover Vídeo' : 'Enviar Notificação'}
                 </Button>
               </DialogFooter>

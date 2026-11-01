@@ -1,12 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AuthService, User } from '@/services/AuthService';
+import { AuthService, User, RegisterData, StoreRegisterData } from '@/services/AuthService';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<User>;
   logout: () => void;
-  register: (userData: Omit<User, 'id'>) => Promise<User>;
+  register: (data: RegisterData) => Promise<User>;
+  registerStore: (data: StoreRegisterData) => Promise<User>;
   updateProfile: (data: Partial<User>) => Promise<void>;
   loading: boolean;
 }
@@ -18,9 +19,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const currentUser = AuthService.getCurrentUser();
-    setUser(currentUser);
-    setLoading(false);
+    AuthService.getCurrentUser().then((u) => {
+      setUser(u);
+      setLoading(false);
+    });
+    // a API respondeu 401 (token expirado ou inválido): encerra a sessão local
+    const onUnauthorized = () => setUser(null);
+    window.addEventListener('neox:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('neox:unauthorized', onUnauthorized);
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
@@ -34,16 +40,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
-  const register = async (userData: Omit<User, 'id'>): Promise<User> => {
-    const newUser = await AuthService.register(userData);
+  const register = async (data: RegisterData): Promise<User> => {
+    const newUser = await AuthService.register(data);
+    setUser(newUser);
+    return newUser;
+  };
+
+  const registerStore = async (data: StoreRegisterData): Promise<User> => {
+    const newUser = await AuthService.registerStore(data);
     setUser(newUser);
     return newUser;
   };
 
   const updateProfile = async (data: Partial<User>) => {
-    if (!user) return;
-    const updatedUser = await AuthService.updateProfile(user.id, data);
-    setUser(updatedUser);
+    setUser(await AuthService.updateProfile(data));
   };
 
   return (
@@ -53,6 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       logout,
       register,
+      registerStore,
       updateProfile,
       loading
     }}>

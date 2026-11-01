@@ -5,6 +5,8 @@ import { StoreDataStep } from './registration/StoreDataStep';
 import { VerificationStep } from './registration/VerificationStep';
 import { RegistrationSuccess } from './registration/RegistrationSuccess';
 import { ArrowLeft, CheckCircle, Rocket } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { FeedbackService } from '@/services/FeedbackService';
 
 export interface PersonalData {
   fullName: string;
@@ -35,6 +37,7 @@ export interface RegistrationData {
 export function EntrepreneurRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
   const navigate = useNavigate();
+  const { registerStore } = useAuth();
   const [registrationData, setRegistrationData] = useState<RegistrationData>({
     personal: {
       fullName: '',
@@ -61,32 +64,35 @@ export function EntrepreneurRegistration() {
     { number: 3, title: 'Verificação', description: 'Documentos e termos' }
   ];
 
-  const handleStepComplete = (stepData: any) => {
+  const handleStepComplete = (stepData: PersonalData | StoreData | VerificationData) => {
     if (currentStep === 1) {
-      setRegistrationData(prev => ({ ...prev, personal: stepData }));
+      setRegistrationData(prev => ({ ...prev, personal: stepData as PersonalData }));
       setCurrentStep(2);
     } else if (currentStep === 2) {
-      setRegistrationData(prev => ({ ...prev, store: stepData }));
+      setRegistrationData(prev => ({ ...prev, store: stepData as StoreData }));
       setCurrentStep(3);
     } else if (currentStep === 3) {
-      setRegistrationData(prev => ({ ...prev, verification: stepData }));
-      // Submit registration
-      handleRegistrationSubmit();
+      const data = { ...registrationData, verification: stepData as VerificationData };
+      setRegistrationData(data);
+      return handleRegistrationSubmit(data);
     }
   };
 
-  const handleRegistrationSubmit = async () => {
+  // recebe os dados completos por parâmetro: o state ainda não refletiu a etapa 3 neste render
+  const handleRegistrationSubmit = async (data: RegistrationData) => {
     try {
-      // Here you would submit to your API
-      console.log('Submitting registration:', registrationData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Move to success step
+      await registerStore({
+        name: data.personal.fullName,
+        email: data.personal.email,
+        password: data.personal.password,
+        storeName: data.store.storeName,
+        cnpj: data.store.cnpj,
+        companyName: data.store.companyName,
+        document: data.verification.document,
+      });
       setCurrentStep(4);
     } catch (error) {
-      console.error('Registration failed:', error);
+      FeedbackService.error(error instanceof Error ? error.message : 'Erro ao concluir o cadastro');
     }
   };
 

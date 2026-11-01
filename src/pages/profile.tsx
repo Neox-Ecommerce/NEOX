@@ -17,7 +17,8 @@ import {
   MessageCircle,
   HelpCircle,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
 import { RoleGuard } from '@/components/RoleGuard';
@@ -32,24 +33,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { UserService } from '@/services/UserService';
-import { StoreService } from '@/services/StoreService';
+import { AuthService } from '@/services/AuthService';
+import { StoreService, type StoreDocument, type StoreStatus } from '@/services/StoreService';
 import { FeedbackService } from '@/services/FeedbackService';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatCNPJ, formatPhone, formatWhatsApp, validateURL, validateInstagram, validateFacebook } from '@/lib/utils';
+import { formatPhone, validateURL, validateInstagram, validateFacebook } from '@/lib/utils';
 
 const profileSchema = z.object({
   name: z.string().min(1, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
   phone: z.string().optional(),
   currentPassword: z.string().optional(),
-  newPassword: z.string().optional(),
-});
+  newPassword: z.string().optional().refine((val) => !val || val.length >= 6, 'A nova senha deve ter ao menos 6 caracteres'),
+}).refine((d) => !d.newPassword || !!d.currentPassword, { message: 'Informe a senha atual', path: ['currentPassword'] });
 
 const storeSchema = z.object({
   nomeFantasia: z.string().min(1, 'Nome fantasia é obrigatório'),
   razaoSocial: z.string().min(1, 'Razão social é obrigatória'),
-  cnpj: z.string().min(1, 'CNPJ é obrigatório'),
   segmento: z.string().min(1, 'Segmento é obrigatório'),
   categoriaTributaria: z.string().min(1, 'Categoria tributária é obrigatória'),
   logo: z.string().optional(),
@@ -70,26 +70,43 @@ const storeSchema = z.object({
   tiposEntrega: z.array(z.string())
 });
 
+const STORE_STATUS: Record<StoreStatus, { label: string; variant: 'success' | 'warning' | 'destructive' }> = {
+  APROVADA: { label: 'aprovada', variant: 'success' },
+  PENDENTE: { label: 'em análise', variant: 'warning' },
+  REJEITADA: { label: 'rejeitada', variant: 'destructive' },
+  SUSPENSA: { label: 'suspensa', variant: 'destructive' },
+};
+
+const DOC_STATUS: Record<StoreDocument['status'], { label: string; variant: 'success' | 'warning' | 'destructive' }> = {
+  VERIFICADO: { label: 'Verificado', variant: 'success' },
+  PENDENTE: { label: 'Em análise', variant: 'warning' },
+  REJEITADO: { label: 'Rejeitado', variant: 'destructive' },
+};
+
 type ProfileFormData = z.infer<typeof profileSchema>;
 type StoreFormData = z.infer<typeof storeSchema>;
 
 export function ProfilePage() {
   const [logoPreview, setLogoPreview] = useState<string>('');
-  const [cnpjDisplay, setCnpjDisplay] = useState<string>('');
   const [telefoneDisplay, setTelefoneDisplay] = useState<string>('');
   const [whatsappDisplay, setWhatsappDisplay] = useState<string>('');
   const [documentModalOpen, setDocumentModalOpen] = useState(false);
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-
-  const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ['profile'],
-    queryFn: UserService.getProfile
-  });
+  const { user: profile, updateProfile } = useAuth();
 
   const { data: store, isLoading: storeLoading } = useQuery({
     queryKey: ['store'],
     queryFn: StoreService.getStore
+  });
+
+  const { data: documents = [] } = useQuery({
+    queryKey: ['store-documents'],
+    queryFn: StoreService.getDocuments
+  });
+
+  const { data: warnings = [] } = useQuery({
+    queryKey: ['store-warnings'],
+    queryFn: StoreService.getWarnings
   });
 
   const profileForm = useForm<ProfileFormData>({
@@ -106,7 +123,6 @@ export function ProfilePage() {
     defaultValues: {
       nomeFantasia: store?.nomeFantasia || '',
       razaoSocial: store?.razaoSocial || '',
-      cnpj: store?.cnpj || '',
       segmento: store?.segmento || '',
       categoriaTributaria: store?.categoriaTributaria || '',
       logo: store?.logo || '',
@@ -135,7 +151,6 @@ export function ProfilePage() {
       storeForm.reset({
         nomeFantasia: store.nomeFantasia,
         razaoSocial: store.razaoSocial,
-        cnpj: store.cnpj,
         segmento: store.segmento,
         categoriaTributaria: store.categoriaTributaria,
         logo: store.logo || '',
@@ -147,31 +162,30 @@ export function ProfilePage() {
         tiposEntrega: store.tiposEntrega
       });
       setLogoPreview(store.logo || '');
-      setCnpjDisplay(store.cnpj);
       setTelefoneDisplay(store.telefone || '');
       setWhatsappDisplay(store.redesSociais?.whatsapp || '');
     }
   }, [store, storeForm]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: UserService.updateProfile,
+    mutationFn: updateProfile,
     onSuccess: () => {
       FeedbackService.success('Perfil atualizado com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
-    onError: () => {
-      FeedbackService.error('Erro ao atualizar perfil');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao atualizar perfil');
     }
   });
 
   const updateStoreMutation = useMutation({
     mutationFn: StoreService.updateStore,
-    onSuccess: () => {
+    onSuccess: (updated) => {
       FeedbackService.success('Dados da loja atualizados com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['store'] });
+      queryClient.setQueryData(['store'], updated);
+      queryClient.invalidateQueries({ queryKey: ['store-settings'] });
     },
-    onError: () => {
-      FeedbackService.error('Erro ao atualizar dados da loja');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao atualizar dados da loja');
     }
   });
 
@@ -179,23 +193,23 @@ export function ProfilePage() {
     mutationFn: ({ file, description }: { file: File; description: string }) =>
       StoreService.uploadDocument(file, description),
     onSuccess: () => {
-      FeedbackService.success('Documento enviado com sucesso! Verificação em andamento.');
-      queryClient.invalidateQueries({ queryKey: ['store'] });
+      FeedbackService.success('Documento enviado! Ele será analisado pela equipe NEOX.');
+      queryClient.invalidateQueries({ queryKey: ['store-documents'] });
     },
-    onError: () => {
-      FeedbackService.error('Erro ao enviar documento');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao enviar documento');
     }
   });
 
   const changePasswordMutation = useMutation({
     mutationFn: ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) =>
-      UserService.changePassword(currentPassword, newPassword),
+      AuthService.changePassword(currentPassword, newPassword),
     onSuccess: () => {
       FeedbackService.success('Senha alterada com sucesso!');
       profileForm.setValue('currentPassword', '');
       profileForm.setValue('newPassword', '');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       FeedbackService.error(error.message || 'Erro ao alterar senha');
     }
   });
@@ -215,7 +229,7 @@ export function ProfilePage() {
   };
 
   const handleDocumentUpload = async (file: File, description: string) => {
-    uploadDocumentMutation.mutate({ file, description });
+    await uploadDocumentMutation.mutateAsync({ file, description });
   };
 
   const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -229,12 +243,6 @@ export function ProfilePage() {
       };
       reader.readAsDataURL(file);
     }
-  };
-
-  const handleCnpjChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = formatCNPJ(event.target.value);
-    setCnpjDisplay(value);
-    storeForm.setValue('cnpj', value);
   };
 
   const handleTelefoneChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,11 +267,11 @@ export function ProfilePage() {
   };
 
   const handleHorarioChange = (dia: string, field: 'ativo' | 'abertura' | 'fechamento', value: boolean | string) => {
-    const currentHorarios = storeForm.getValues('horarioFuncionamento') || {};
-    storeForm.setValue(`horarioFuncionamento.${dia}.${field}`, value);
+    const atual = storeForm.getValues(`horarioFuncionamento.${dia}`) || { ativo: false, abertura: '08:00', fechamento: '18:00' };
+    storeForm.setValue(`horarioFuncionamento.${dia}`, { ...atual, [field]: value });
   };
 
-  if (profileLoading || storeLoading) {
+  if (storeLoading) {
     return (
       <RoleGuard requiredRole="EMPREENDEDOR">
         <AppShell>
@@ -364,6 +372,11 @@ export function ProfilePage() {
                               {...profileForm.register('currentPassword')}
                               placeholder="Senha atual"
                             />
+                            {profileForm.formState.errors.currentPassword && (
+                              <p className="text-sm text-red-500">
+                                {profileForm.formState.errors.currentPassword.message}
+                              </p>
+                            )}
                           </div>
 
                           <div className="space-y-2">
@@ -374,6 +387,11 @@ export function ProfilePage() {
                               {...profileForm.register('newPassword')}
                               placeholder="Nova senha"
                             />
+                            {profileForm.formState.errors.newPassword && (
+                              <p className="text-sm text-red-500">
+                                {profileForm.formState.errors.newPassword.message}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -404,10 +422,13 @@ export function ProfilePage() {
                         Status de Verificação
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Badge 
+                    <CardContent className="space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Badge variant={STORE_STATUS[store?.status ?? 'PENDENTE'].variant}>
+                            Loja {STORE_STATUS[store?.status ?? 'PENDENTE'].label}
+                          </Badge>
+                          <Badge
                             variant={store?.cnpjVerificado ? "success" : "warning"}
                             className="flex items-center gap-1"
                           >
@@ -416,26 +437,59 @@ export function ProfilePage() {
                             ) : (
                               <AlertCircle className="h-3 w-3" />
                             )}
-                            {store?.cnpjVerificado ? 'CNPJ Verificado' : 'Verificação Pendente'}
+                            {store?.cnpjVerificado ? 'CNPJ Verificado' : 'CNPJ não verificado'}
                           </Badge>
                           <span className="text-sm text-muted-foreground">
-                            {store?.cnpjVerificado 
-                              ? 'Sua empresa foi verificada com sucesso'
-                              : 'Envie documentos para verificar seu CNPJ'
+                            {store?.cnpjVerificado
+                              ? 'Sua empresa foi verificada pela equipe NEOX'
+                              : 'Envie documentos da empresa para a equipe NEOX analisar'
                             }
                           </span>
                         </div>
-                        {!store?.cnpjVerificado && (
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setDocumentModalOpen(true)}
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            Enviar Documento
-                          </Button>
-                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDocumentModalOpen(true)}
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Enviar Documento
+                        </Button>
                       </div>
+
+                      {store?.statusReason && store.status !== 'APROVADA' && (
+                        <p className="text-sm text-red-600">Motivo: {store.statusReason}</p>
+                      )}
+
+                      {documents.length > 0 && (
+                        <div className="border-t pt-4 space-y-2">
+                          <p className="text-sm font-medium">Documentos enviados</p>
+                          {documents.map((doc) => (
+                            <div key={doc.id} className="flex items-center justify-between text-sm">
+                              <a href={doc.url} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate">
+                                {doc.tipo}{doc.description ? ` - ${doc.description}` : ''}
+                              </a>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-gray-500">{doc.createdAt.toLocaleDateString('pt-BR')}</span>
+                                <Badge variant={DOC_STATUS[doc.status].variant}>{DOC_STATUS[doc.status].label}</Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {warnings.filter((w) => !w.resolvido).length > 0 && (
+                        <div className="border-t pt-4 space-y-2">
+                          <p className="text-sm font-medium flex items-center gap-2">
+                            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                            Avisos da equipe NEOX
+                          </p>
+                          {warnings.filter((w) => !w.resolvido).map((w) => (
+                            <p key={w.id} className="text-sm text-gray-700 dark:text-gray-300">
+                              {w.createdAt.toLocaleDateString('pt-BR')}: {w.motivo}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -464,7 +518,7 @@ export function ProfilePage() {
                             <div>
                               <input
                                 type="file"
-                                accept="image/*"
+                                accept="image/jpeg,image/png,image/webp"
                                 onChange={handleLogoUpload}
                                 className="hidden"
                                 id="logo-upload"
@@ -516,16 +570,13 @@ export function ProfilePage() {
                               <Label htmlFor="cnpj">CNPJ *</Label>
                               <Input
                                 id="cnpj"
-                                value={cnpjDisplay}
-                                onChange={handleCnpjChange}
-                                placeholder="00.000.000/0000-00"
-                                maxLength={18}
+                                value={store?.cnpj ?? ''}
+                                readOnly
+                                disabled
                               />
-                              {storeForm.formState.errors.cnpj && (
-                                <p className="text-sm text-red-500">
-                                  {storeForm.formState.errors.cnpj.message}
-                                </p>
-                              )}
+                              <p className="text-xs text-gray-500">
+                                O CNPJ não pode ser alterado. Se houver erro, abra um ticket em Ajuda.
+                              </p>
                             </div>
                           </div>
 

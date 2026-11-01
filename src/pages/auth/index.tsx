@@ -1,41 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { LoginForm } from './components/LoginForm';
 import { RegisterForm } from './components/RegisterForm';
-import { RoleSelector } from './components/RoleSelector';
 import { FloatingIcons } from './components/FloatingIcons';
 import { EntrepreneurRegistration } from './components/EntrepreneurRegistration';
 import { ArrowRight, Building } from 'lucide-react';
 
-export type UserRole = 'cliente' | 'empreendedor';
-
-export interface UserRoles {
-  cliente: boolean;
-  empreendedor: boolean;
-}
-
 export function AuthPage() {
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'entrepreneur'>('login');
-  const [showRoleSelector, setShowRoleSelector] = useState(false);
-  const [availableRoles] = useState<UserRoles>({ cliente: true, empreendedor: true }); // Mock data
-  const [selectedRole, setSelectedRole] = useState<UserRole>('cliente');
-
-  const handleLoginSuccess = (userRoles: UserRoles) => {
-    const roles = Object.entries(userRoles).filter(([_, hasRole]) => hasRole) as [UserRole, boolean][];
-    
-    if (roles.length > 1) {
-      setShowRoleSelector(true);
-    } else {
-      // Direct login with single role
-      console.log('Logging in with role:', roles[0][0]);
-    }
-  };
-
-  const handleRoleSelection = (role: UserRole) => {
-    setSelectedRole(role);
-    setShowRoleSelector(false);
-    console.log('Selected role:', role);
-  };
-
   const handleEntrepreneurRegistration = () => {
     setActiveTab('entrepreneur');
   };
@@ -53,15 +24,6 @@ export function AuthPage() {
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
         <div className="absolute top-40 left-40 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
       </div>
-
-      {/* Role Selector Modal */}
-      {showRoleSelector && (
-        <RoleSelector
-          availableRoles={availableRoles}
-          onRoleSelect={handleRoleSelection}
-          onClose={() => setShowRoleSelector(false)}
-        />
-      )}
 
       <div className="w-full max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-center relative z-10">
         {/* Left side - Auth Card */}
@@ -100,7 +62,7 @@ export function AuthPage() {
             {/* Form Content */}
             <div className="transition-all duration-300 ease-in-out">
               {activeTab === 'login' ? (
-                <LoginForm onLoginSuccess={handleLoginSuccess} />
+                <LoginForm />
               ) : (
                 <RegisterForm onEntrepreneurRegistration={handleEntrepreneurRegistration} />
               )}

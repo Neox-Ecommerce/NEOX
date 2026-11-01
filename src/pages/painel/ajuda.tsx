@@ -1,14 +1,11 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   HelpCircle, 
   Search, 
   MessageSquare,
-  FileText,
   Video,
   Mail,
-  Phone,
-  ExternalLink,
   ThumbsUp,
   ThumbsDown,
   Plus,
@@ -16,11 +13,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  User,
-  Users,
-  ChevronRight,
-  ChevronDown,
-  Play
 } from 'lucide-react';
 import { AppShell } from '@/components/AppShell';
 import { RoleGuard } from '@/components/RoleGuard';
@@ -46,7 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { HelpService } from '@/services/HelpService';
+import { HelpService, type Tutorial } from '@/services/HelpService';
 import { FeedbackService } from '@/services/FeedbackService';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -55,7 +47,8 @@ export function AjudaPage() {
   const [selectedFAQCategory, setSelectedFAQCategory] = useState<string>('');
   const [selectedTutorialCategory, setSelectedTutorialCategory] = useState<string>('');
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [openTutorial, setOpenTutorial] = useState<Tutorial | null>(null);
   const [ticketData, setTicketData] = useState({
     subject: '',
     description: '',
@@ -63,8 +56,9 @@ export function AjudaPage() {
     priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent'
   });
   const [newMessage, setNewMessage] = useState('');
-
   const { user } = useAuth();
+  const [contactData, setContactData] = useState({ name: user?.name ?? '', email: user?.email ?? '', subject: '', message: '' });
+
   const queryClient = useQueryClient();
 
   const { data: faq = [], isLoading: faqLoading } = useQuery({
@@ -74,8 +68,9 @@ export function AjudaPage() {
 
   const { data: tickets = [], isLoading: ticketsLoading } = useQuery({
     queryKey: ['support-tickets', user?.id],
-    queryFn: () => HelpService.getSupportTickets(user?.id || '1')
+    queryFn: HelpService.getSupportTickets
   });
+  const selectedTicket = tickets.find((t) => t.id === selectedTicketId) ?? null;
 
   const { data: tutorials = [], isLoading: tutorialsLoading } = useQuery({
     queryKey: ['tutorials', selectedTutorialCategory],
@@ -95,8 +90,8 @@ export function AjudaPage() {
         priority: 'medium'
       });
     },
-    onError: () => {
-      FeedbackService.error('Erro ao criar ticket');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao criar ticket');
     }
   });
 
@@ -108,10 +103,37 @@ export function AjudaPage() {
       FeedbackService.success('Mensagem enviada com sucesso!');
       setNewMessage('');
     },
-    onError: () => {
-      FeedbackService.error('Erro ao enviar mensagem');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao enviar mensagem');
     }
   });
+
+  const contactMutation = useMutation({
+    mutationFn: HelpService.sendContactMessage,
+    onSuccess: (res) => {
+      FeedbackService.success(res.message);
+      setContactData((prev) => ({ ...prev, subject: '', message: '' }));
+    },
+    onError: (error: Error) => FeedbackService.error(error.message || 'Erro ao enviar mensagem'),
+  });
+
+  const handleOpenTutorial = (id: string) => {
+    HelpService.getTutorialById(id)
+      .then((t) => {
+        setOpenTutorial(t);
+        queryClient.invalidateQueries({ queryKey: ['tutorials'] });
+      })
+      .catch((error: Error) => FeedbackService.error(error.message || 'Erro ao abrir tutorial'));
+  };
+
+  const handleSendContact = (e: FormEvent) => {
+    e.preventDefault();
+    if (!contactData.name || !contactData.email || !contactData.subject || !contactData.message) {
+      FeedbackService.error('Preencha todos os campos');
+      return;
+    }
+    contactMutation.mutate(contactData);
+  };
 
   const rateFAQMutation = useMutation({
     mutationFn: ({ faqId, helpful }: { faqId: string; helpful: boolean }) => 
@@ -128,10 +150,7 @@ export function AjudaPage() {
       return;
     }
 
-    createTicketMutation.mutate({
-      ...ticketData,
-      userId: user?.id || '1'
-    });
+    createTicketMutation.mutate(ticketData);
   };
 
   const handleSendMessage = () => {
@@ -434,7 +453,7 @@ export function AjudaPage() {
                           </div>
                           <Button 
                             variant="outline"
-                            onClick={() => setSelectedTicket(ticket)}
+                            onClick={() => setSelectedTicketId(ticket.id)}
                           >
                             Ver Detalhes
                           </Button>
@@ -447,7 +466,7 @@ export function AjudaPage() {
 
               {/* Ticket Details Dialog */}
               {selectedTicket && (
-                <Dialog open={!!selectedTicket} onOpenChange={(open) => !open && setSelectedTicket(null)}>
+                <Dialog open={!!selectedTicket} onOpenChange={(open) => !open && setSelectedTicketId(null)}>
                   <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <div className="flex items-center justify-between">
@@ -465,7 +484,7 @@ export function AjudaPage() {
                     <div className="space-y-6">
                       {/* Ticket Messages */}
                       <div className="space-y-4">
-                        {selectedTicket.messages.map((message: any) => (
+                        {selectedTicket.messages.map((message) => (
                           <div 
                             key={message.id} 
                             className={`flex ${message.isFromSupport ? 'justify-start' : 'justify-end'}`}
@@ -487,7 +506,7 @@ export function AjudaPage() {
                                 </div>
                                 <div>
                                   <div className="font-medium">
-                                    {message.isFromSupport ? 'Suporte NeoxStore' : user?.name || 'Você'}
+                                    {message.isFromSupport ? 'Suporte NEOX' : user?.name || 'Você'}
                                   </div>
                                   <div className="text-xs text-gray-500">
                                     {new Date(message.createdAt).toLocaleString('pt-BR')}
@@ -613,7 +632,7 @@ export function AjudaPage() {
                       {filteredTutorials.map((tutorial) => (
                         <Card key={tutorial.id} className="hover:shadow-md transition-shadow">
                           <div className="relative">
-                            {tutorial.steps[0].image ? (
+                            {tutorial.steps[0]?.image ? (
                               <img 
                                 src={tutorial.steps[0].image} 
                                 alt={tutorial.title}
@@ -624,11 +643,6 @@ export function AjudaPage() {
                                 <Video className="h-12 w-12 text-gray-400" />
                               </div>
                             )}
-                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                              <Button size="icon" className="rounded-full bg-white/20 backdrop-blur-sm">
-                                <Play className="h-6 w-6 text-white" />
-                              </Button>
-                            </div>
                             <Badge className="absolute top-2 right-2" variant={
                               tutorial.difficulty === 'beginner' ? 'success' :
                               tutorial.difficulty === 'intermediate' ? 'warning' : 'destructive'
@@ -657,7 +671,7 @@ export function AjudaPage() {
                               </div>
                             </div>
                             
-                            <Button className="w-full mt-4">
+                            <Button className="w-full mt-4" onClick={() => handleOpenTutorial(tutorial.id)}>
                               Ver Tutorial
                             </Button>
                           </CardContent>
@@ -689,23 +703,8 @@ export function AjudaPage() {
                           <p className="text-gray-600 dark:text-gray-400">
                             {contactInfo.email}
                           </p>
-                          <Button variant="link" className="p-0 h-auto text-primary">
-                            Enviar email
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 bg-primary/10 rounded-full">
-                          <Phone className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">Telefone</h3>
-                          <p className="text-gray-600 dark:text-gray-400">
-                            {contactInfo.phone}
-                          </p>
-                          <Button variant="link" className="p-0 h-auto text-primary">
-                            Ligar agora
+                          <Button variant="link" className="p-0 h-auto text-primary" asChild>
+                            <a href={`mailto:${contactInfo.email}`}>Enviar email</a>
                           </Button>
                         </div>
                       </div>
@@ -715,12 +714,12 @@ export function AjudaPage() {
                           <MessageSquare className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">WhatsApp</h3>
+                          <h3 className="font-medium text-gray-900 dark:text-white">Tickets de suporte</h3>
                           <p className="text-gray-600 dark:text-gray-400">
-                            {contactInfo.phone}
+                            Acompanhe o atendimento pela aba Meus Tickets
                           </p>
-                          <Button variant="link" className="p-0 h-auto text-primary">
-                            Conversar no WhatsApp
+                          <Button variant="link" className="p-0 h-auto text-primary" onClick={() => setTicketModalOpen(true)}>
+                            Abrir ticket
                           </Button>
                         </div>
                       </div>
@@ -729,18 +728,12 @@ export function AjudaPage() {
                     <div className="border-t pt-4">
                       <h3 className="font-medium text-gray-900 dark:text-white mb-2">Horário de Atendimento</h3>
                       <div className="space-y-1 text-sm">
-                        <div className="flex justify-between">
-                          <span>Segunda a Sexta:</span>
-                          <span>9h às 18h</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Sábado:</span>
-                          <span>9h às 12h</span>
-                        </div>
-                        <div className="flex justify-between text-gray-500">
-                          <span>Domingo:</span>
-                          <span>Fechado</span>
-                        </div>
+                        {contactInfo.businessHours.map((h) => (
+                          <div key={h.days} className="flex justify-between">
+                            <span>{h.days}:</span>
+                            <span>{h.hours}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </CardContent>
@@ -754,11 +747,13 @@ export function AjudaPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <form className="space-y-4">
+                    <form className="space-y-4" onSubmit={handleSendContact}>
                       <div className="space-y-2">
                         <Label htmlFor="contact-name">Nome</Label>
                         <Input
                           id="contact-name"
+                          value={contactData.name}
+                          onChange={(e) => setContactData((prev) => ({ ...prev, name: e.target.value }))}
                           placeholder="Seu nome completo"
                         />
                       </div>
@@ -768,6 +763,8 @@ export function AjudaPage() {
                         <Input
                           id="contact-email"
                           type="email"
+                          value={contactData.email}
+                          onChange={(e) => setContactData((prev) => ({ ...prev, email: e.target.value }))}
                           placeholder="seu@email.com"
                         />
                       </div>
@@ -776,6 +773,8 @@ export function AjudaPage() {
                         <Label htmlFor="contact-subject">Assunto</Label>
                         <Input
                           id="contact-subject"
+                          value={contactData.subject}
+                          onChange={(e) => setContactData((prev) => ({ ...prev, subject: e.target.value }))}
                           placeholder="Assunto da mensagem"
                         />
                       </div>
@@ -784,78 +783,50 @@ export function AjudaPage() {
                         <Label htmlFor="contact-message">Mensagem</Label>
                         <Textarea
                           id="contact-message"
-                          placeholder="Digite sua mensagem..."
+                          value={contactData.message}
+                          onChange={(e) => setContactData((prev) => ({ ...prev, message: e.target.value }))}
+                          placeholder="Digite sua mensagem (mínimo 10 caracteres)..."
                           rows={4}
                         />
                       </div>
 
-                      <Button className="w-full">
+                      <Button type="submit" className="w-full" disabled={contactMutation.isPending}>
                         <Send className="h-4 w-4 mr-2" />
-                        Enviar Mensagem
+                        {contactMutation.isPending ? 'Enviando...' : 'Enviar Mensagem'}
                       </Button>
                     </form>
                   </CardContent>
                 </Card>
               </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recursos Adicionais</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="p-4 border rounded-lg">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-blue-100 text-blue-600 rounded-full">
-                          <FileText className="h-5 w-5" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white">Documentação</h3>
-                      </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                        Acesse nossa documentação completa com guias detalhados
-                      </p>
-                      <Button variant="outline" className="w-full">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Ver Documentação
-                      </Button>
-                    </div>
-
-                    <div className="p-4 border rounded-lg">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-purple-100 text-purple-600 rounded-full">
-                          <Video className="h-5 w-5" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white">Vídeos</h3>
-                      </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                        Assista a vídeos tutoriais sobre como usar a plataforma
-                      </p>
-                      <Button variant="outline" className="w-full">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Canal do YouTube
-                      </Button>
-                    </div>
-
-                    <div className="p-4 border rounded-lg">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-green-100 text-green-600 rounded-full">
-                          <Users className="h-5 w-5" />
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white">Comunidade</h3>
-                      </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                        Participe da nossa comunidade e conecte-se com outros usuários
-                      </p>
-                      <Button variant="outline" className="w-full">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Acessar Fórum
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </TabsContent>
           </Tabs>
+
+          {/* Tutorial Dialog */}
+          <Dialog open={!!openTutorial} onOpenChange={(open) => !open && setOpenTutorial(null)}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{openTutorial?.title}</DialogTitle>
+                <DialogDescription>
+                  {openTutorial?.description} • {openTutorial?.estimatedTime} min
+                </DialogDescription>
+              </DialogHeader>
+              <ol className="space-y-4">
+                {openTutorial?.steps.map((step, index) => (
+                  <li key={index} className="flex gap-3">
+                    <div className="h-7 w-7 shrink-0 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                      {index + 1}
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-gray-900 dark:text-white">{step.title}</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{step.content}</p>
+                      {step.image && <img src={step.image} alt={step.title} className="rounded-lg max-h-60" />}
+                      {step.video && <video src={step.video} controls className="rounded-lg max-h-60 w-full" />}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </DialogContent>
+          </Dialog>
 
           {/* Create Ticket Modal */}
           <Dialog open={ticketModalOpen} onOpenChange={setTicketModalOpen}>
@@ -882,7 +853,7 @@ export function AjudaPage() {
                   <Label htmlFor="ticket-category">Categoria *</Label>
                   <Select 
                     value={ticketData.category} 
-                    onValueChange={(value) => setTicketData(prev => ({ ...prev, category: value as any }))}
+                    onValueChange={(value) => setTicketData(prev => ({ ...prev, category: value as typeof prev.category }))}
                   >
                     <SelectTrigger id="ticket-category">
                       <SelectValue placeholder="Selecione uma categoria" />
@@ -901,7 +872,7 @@ export function AjudaPage() {
                   <Label htmlFor="ticket-priority">Prioridade *</Label>
                   <Select 
                     value={ticketData.priority} 
-                    onValueChange={(value) => setTicketData(prev => ({ ...prev, priority: value as any }))}
+                    onValueChange={(value) => setTicketData(prev => ({ ...prev, priority: value as typeof prev.priority }))}
                   >
                     <SelectTrigger id="ticket-priority">
                       <SelectValue placeholder="Selecione a prioridade" />
@@ -936,7 +907,6 @@ export function AjudaPage() {
                       <ul className="text-sm text-yellow-700 mt-1 space-y-1 list-disc list-inside">
                         <li>Seja claro e detalhado na descrição do problema</li>
                         <li>Informe quais passos você já tentou para resolver</li>
-                        <li>Inclua capturas de tela se possível</li>
                       </ul>
                     </div>
                   </div>

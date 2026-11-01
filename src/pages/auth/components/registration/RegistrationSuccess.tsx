@@ -1,13 +1,7 @@
-import React from 'react';
 import { CheckCircle, Clock, Settings, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export function RegistrationSuccess() {
-  const handleGoToDashboard = () => {
-    // In a real app, this would navigate to the dashboard
-    console.log('Navigating to dashboard...');
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 flex items-center justify-center p-4">
       {/* Background decorative elements */}
@@ -29,14 +23,14 @@ export function RegistrationSuccess() {
             Cadastro Realizado com Sucesso!
           </h1>
           <p className="text-lg text-gray-600 mb-8">
-            Sua conta foi criada e está sendo analisada pela nossa equipe
+            Sua conta foi criada. Sua loja agora aguarda a aprovação de um administrador da NEOX.
           </p>
 
           {/* Status Badge */}
           <div className="inline-flex items-center space-x-2 bg-yellow-50 border border-yellow-200 rounded-full px-6 py-3 mb-8">
             <Clock className="w-5 h-5 text-yellow-600" />
             <span className="text-sm font-medium text-yellow-800">
-              Loja em análise – configure o visual enquanto aguarda
+              Loja aguardando aprovação – prepare tudo pelo painel enquanto isso
             </span>
           </div>
 
@@ -52,7 +46,7 @@ export function RegistrationSuccess() {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Análise de Documentos</p>
-                  <p className="text-sm text-gray-600">Nossa equipe verificará seus documentos em até 2 dias úteis</p>
+                  <p className="text-sm text-gray-600">Um administrador da NEOX vai conferir seus dados e documentos. Acompanhe o status no painel.</p>
                 </div>
               </div>
               
@@ -62,7 +56,7 @@ export function RegistrationSuccess() {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Configure sua Loja</p>
-                  <p className="text-sm text-gray-600">Personalize o visual, adicione produtos e configure métodos de pagamento</p>
+                  <p className="text-sm text-gray-600">Complete o perfil da loja, cadastre produtos e defina as regras de frete</p>
                 </div>
               </div>
               
@@ -72,7 +66,7 @@ export function RegistrationSuccess() {
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Comece a Vender</p>
-                  <p className="text-sm text-gray-600">Após aprovação, sua loja estará pronta para receber pedidos</p>
+                  <p className="text-sm text-gray-600">Após a aprovação, sua loja aparece para os clientes e pode receber pedidos</p>
                 </div>
               </div>
             </div>
@@ -80,19 +74,19 @@ export function RegistrationSuccess() {
 
           {/* Action Buttons */}
           <div className="space-y-4">
-            <Link to="/painel/dashboard">
+            <Link to="/painel/dashboard" className="block">
               <button
-                onClick={handleGoToDashboard}
+                type="button"
                 className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] focus:ring-4 focus:ring-green-500/30 flex items-center justify-center space-x-2"
               >
                 <Settings className="w-5 h-5" />
-                <span>Ir para o Dashboard</span>
+                <span>Ir para o Painel</span>
                 <ArrowRight className="w-5 h-5" />
               </button>
             </Link>
             
             <p className="text-sm text-gray-500">
-              Você receberá um e-mail quando a análise for concluída
+              O resultado da análise aparece no topo do painel da sua loja
             </p>
           </div>
 

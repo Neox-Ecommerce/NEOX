@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
@@ -6,25 +5,23 @@ import { AppShell } from '@/components/AppShell';
 import { RoleGuard } from '@/components/RoleGuard';
 import { ProductForm } from '@/components/ProductForm';
 import { Button } from '@/components/ui/button';
-import { ProductService } from '@/services/ProductService';
+import { ProductService, CreateProductData } from '@/services/ProductService';
 import { FeedbackService } from '@/services/FeedbackService';
-import { useAuth } from '@/contexts/AuthContext';
 
 export function ProductFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const isEdit = id && id !== 'novo';
 
-  const { data: product, isLoading, error } = useQuery({
+  const { data: product, isLoading } = useQuery({
     queryKey: ['product', id],
     queryFn: () => ProductService.getById(id!),
     enabled: !!isEdit
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => ProductService.create(data, user?.lojaId || '1'),
+    mutationFn: (data: CreateProductData) => ProductService.create(data),
     onSuccess: () => {
       FeedbackService.success('Produto criado com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -32,13 +29,13 @@ export function ProductFormPage() {
       queryClient.invalidateQueries({ queryKey: ['product-stats'] });
       navigate('/painel/produtos');
     },
-    onError: () => {
-      FeedbackService.error('Erro ao criar produto');
+    onError: (error: Error) => {
+      FeedbackService.error('Erro ao criar produto', error.message);
     }
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => 
+    mutationFn: ({ id, data }: { id: string; data: CreateProductData }) => 
       ProductService.update(id, data),
     onSuccess: () => {
       FeedbackService.success('Produto atualizado com sucesso!');
@@ -48,12 +45,12 @@ export function ProductFormPage() {
       queryClient.invalidateQueries({ queryKey: ['product-stats'] });
       navigate('/painel/produtos');
     },
-    onError: () => {
-      FeedbackService.error('Erro ao atualizar produto');
+    onError: (error: Error) => {
+      FeedbackService.error('Erro ao atualizar produto', error.message);
     }
   });
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: CreateProductData) => {
     if (isEdit && id) {
       updateMutation.mutate({ id, data });
     } else {

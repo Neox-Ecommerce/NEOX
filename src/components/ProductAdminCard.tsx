@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, Package, Eye, EyeOff, Star } from 'lucide-react';
+import { Edit, Trash2, Package, Eye, EyeOff } from 'lucide-react';
 import { Product } from '@/services/ProductService';
 import { formatCurrency } from '@/lib/utils';
 

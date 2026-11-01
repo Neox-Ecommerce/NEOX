@@ -1,30 +1,21 @@
-import React, { useState } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
-  Settings, 
   Store, 
-  User, 
   Bell, 
-  Globe,
-  Shield,
   Search,
   Palette,
   CreditCard,
   Truck,
   Percent,
   Save,
-  Check,
-  AlertTriangle,
-  Smartphone,
-  Mail,
   Moon,
   Sun,
-  Clock,
-  Languages,
   Upload,
   Plus,
   Trash2
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { RoleGuard } from '@/components/RoleGuard';
 import { Button } from '@/components/ui/button';
@@ -35,19 +26,24 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { SettingsService } from '@/services/SettingsService';
+import { SettingsService, type StoreSettings } from '@/services/SettingsService';
 import { FeedbackService } from '@/services/FeedbackService';
-import { useAuth } from '@/contexts/AuthContext';
+
+type Section = keyof StoreSettings;
 
 export function ConfiguracoesPage() {
-  const [activeTab, setActiveTab] = useState('general');
-  const { user } = useAuth();
   const queryClient = useQueryClient();
+  // rascunho local: os campos editam o rascunho e cada botão "Salvar" envia só a sua seção
+  const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
 
-  const { data: storeSettings, isLoading: storeSettingsLoading } = useQuery({
+  const { data: savedSettings, isLoading: storeSettingsLoading } = useQuery({
     queryKey: ['store-settings'],
     queryFn: SettingsService.getStoreSettings
   });
+
+  useEffect(() => {
+    if (savedSettings) setStoreSettings(savedSettings);
+  }, [savedSettings]);
 
   const { data: userPreferences, isLoading: userPreferencesLoading } = useQuery({
     queryKey: ['user-preferences'],
@@ -56,12 +52,13 @@ export function ConfiguracoesPage() {
 
   const updateStoreSettingsMutation = useMutation({
     mutationFn: SettingsService.updateStoreSettings,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['store-settings'] });
+    onSuccess: (data) => {
+      queryClient.setQueryData(['store-settings'], data);
+      queryClient.invalidateQueries({ queryKey: ['store'] });
       FeedbackService.success('Configurações da loja atualizadas com sucesso!');
     },
-    onError: () => {
-      FeedbackService.error('Erro ao atualizar configurações da loja');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao atualizar configurações da loja');
     }
   });
 
@@ -71,34 +68,33 @@ export function ConfiguracoesPage() {
       queryClient.invalidateQueries({ queryKey: ['user-preferences'] });
       FeedbackService.success('Preferências atualizadas com sucesso!');
     },
-    onError: () => {
-      FeedbackService.error('Erro ao atualizar preferências');
+    onError: (error: Error) => {
+      FeedbackService.error(error.message || 'Erro ao atualizar preferências');
     }
   });
 
-  const handleUpdateStoreSettings = (section: string, data: any) => {
-    if (!storeSettings) return;
-    
-    const updatedSettings = {
-      ...storeSettings,
-      [section]: {
-        ...storeSettings[section as keyof typeof storeSettings],
-        ...data
-      }
-    };
-    
-    updateStoreSettingsMutation.mutate(updatedSettings);
+  const handleUpdateStoreSettings = <S extends Section>(section: S, data: Partial<StoreSettings[S]>) => {
+    setStoreSettings((prev) => (prev ? { ...prev, [section]: { ...prev[section], ...data } } : prev));
   };
 
-  const handleUpdateUserPreferences = (data: any) => {
-    if (!userPreferences) return;
-    
-    const updatedPreferences = {
-      ...userPreferences,
-      ...data
-    };
-    
-    updateUserPreferencesMutation.mutate(updatedPreferences);
+  const saveSection = (section: Section) => {
+    if (storeSettings) updateStoreSettingsMutation.mutate({ [section]: storeSettings[section] });
+  };
+
+  const handleImageUpload = (field: 'logo' | 'favicon') => (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      FeedbackService.error('Use uma imagem JPG, PNG ou WEBP');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => handleUpdateStoreSettings('general', { [field]: reader.result as string });
+    reader.readAsDataURL(file);
+  };
+
+  const handleUpdateUserPreferences = (data: Partial<NonNullable<typeof userPreferences>>) => {
+    updateUserPreferencesMutation.mutate(data);
   };
 
   const toggleTheme = () => {
@@ -116,7 +112,7 @@ export function ConfiguracoesPage() {
   const languages = SettingsService.getLanguages();
   const brazilianStates = SettingsService.getBrazilianStates();
 
-  if (storeSettingsLoading || userPreferencesLoading) {
+  if (storeSettingsLoading || userPreferencesLoading || !storeSettings) {
     return (
       <RoleGuard requiredRole="EMPREENDEDOR">
         <AppShell>
@@ -160,8 +156,8 @@ export function ConfiguracoesPage() {
             </div>
           </div>
 
-          <Tabs defaultValue="general" className="space-y-6" onValueChange={setActiveTab}>
-            <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+          <Tabs defaultValue="general" className="space-y-6">
+            <TabsList className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
               <TabsTrigger value="general" className="flex items-center gap-2">
                 <Store className="h-4 w-4" />
                 <span className="hidden md:inline">Geral</span>
@@ -189,10 +185,6 @@ export function ConfiguracoesPage() {
               <TabsTrigger value="seo" className="flex items-center gap-2">
                 <Search className="h-4 w-4" />
                 <span className="hidden md:inline">SEO</span>
-              </TabsTrigger>
-              <TabsTrigger value="security" className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                <span className="hidden md:inline">Segurança</span>
               </TabsTrigger>
             </TabsList>
 
@@ -288,7 +280,7 @@ export function ConfiguracoesPage() {
                   </div>
 
                   <div className="flex justify-end">
-                    <Button>
+                    <Button onClick={() => saveSection('general')} disabled={updateStoreSettingsMutation.isPending}>
                       <Save className="h-4 w-4 mr-2" />
                       Salvar Alterações
                     </Button>
@@ -406,7 +398,7 @@ export function ConfiguracoesPage() {
                   </div>
 
                   <div className="flex justify-end">
-                    <Button>
+                    <Button onClick={() => saveSection('contact')} disabled={updateStoreSettingsMutation.isPending}>
                       <Save className="h-4 w-4 mr-2" />
                       Salvar Alterações
                     </Button>
@@ -475,9 +467,10 @@ export function ConfiguracoesPage() {
                       <div>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg,image/png,image/webp"
                           className="hidden"
                           id="logo-upload"
+                          onChange={handleImageUpload('logo')}
                         />
                         <Label htmlFor="logo-upload">
                           <Button type="button" variant="outline" asChild>
@@ -508,9 +501,10 @@ export function ConfiguracoesPage() {
                       <div>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg,image/png,image/webp"
                           className="hidden"
                           id="favicon-upload"
+                          onChange={handleImageUpload('favicon')}
                         />
                         <Label htmlFor="favicon-upload">
                           <Button type="button" variant="outline" asChild>
@@ -525,7 +519,7 @@ export function ConfiguracoesPage() {
                   </div>
 
                   <div className="flex justify-end">
-                    <Button>
+                    <Button onClick={() => saveSection('general')} disabled={updateStoreSettingsMutation.isPending}>
                       <Save className="h-4 w-4 mr-2" />
                       Salvar Alterações
                     </Button>
@@ -553,7 +547,7 @@ export function ConfiguracoesPage() {
                         step="0.01"
                         value={storeSettings?.shipping.freeShippingThreshold}
                         onChange={(e) => handleUpdateStoreSettings('shipping', { 
-                          freeShippingThreshold: parseFloat(e.target.value) 
+                          freeShippingThreshold: Number(e.target.value) || 0 
                         })}
                         placeholder="0.00"
                       />
@@ -571,7 +565,7 @@ export function ConfiguracoesPage() {
                         step="0.01"
                         value={storeSettings?.shipping.defaultShippingCost}
                         onChange={(e) => handleUpdateStoreSettings('shipping', { 
-                          defaultShippingCost: parseFloat(e.target.value) 
+                          defaultShippingCost: Number(e.target.value) || 0 
                         })}
                         placeholder="0.00"
                       />
@@ -591,7 +585,7 @@ export function ConfiguracoesPage() {
                         step="1"
                         value={storeSettings?.shipping.processingTime}
                         onChange={(e) => handleUpdateStoreSettings('shipping', { 
-                          processingTime: parseInt(e.target.value) 
+                          processingTime: Math.trunc(Number(e.target.value)) || 0 
                         })}
                         placeholder="1"
                       />
@@ -626,7 +620,7 @@ export function ConfiguracoesPage() {
                   </div>
 
                   <div className="flex justify-end">
-                    <Button>
+                    <Button onClick={() => saveSection('shipping')} disabled={updateStoreSettingsMutation.isPending}>
                       <Save className="h-4 w-4 mr-2" />
                       Salvar Alterações
                     </Button>
@@ -645,11 +639,14 @@ export function ConfiguracoesPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600 mb-4">
-                    As configurações de pagamento são gerenciadas na seção de Integrações.
+                    Os pagamentos dos pedidos são processados pelo Mercado Pago da plataforma NEOX: você não precisa
+                    cadastrar credenciais para vender. Os valores recebidos aparecem em Financeiro.
                   </p>
-                  <Button variant="outline" onClick={() => window.location.href = '/painel/integracoes'}>
-                    <CreditCard className="h-4 w-4 mr-2" />
-                    Ir para Integrações de Pagamento
+                  <Button variant="outline" asChild>
+                    <Link to="/painel/financeiro">
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Ir para o Financeiro
+                    </Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -689,7 +686,7 @@ export function ConfiguracoesPage() {
                       step="0.01"
                       value={storeSettings?.taxes.defaultTaxRate}
                       onChange={(e) => handleUpdateStoreSettings('taxes', { 
-                        defaultTaxRate: parseFloat(e.target.value) 
+                        defaultTaxRate: Number(e.target.value) || 0 
                       })}
                       placeholder="0"
                     />
@@ -730,7 +727,7 @@ export function ConfiguracoesPage() {
                             value={tax.rate}
                             onChange={(e) => {
                               const newTaxes = [...storeSettings.taxes.taxByState];
-                              newTaxes[index].rate = parseFloat(e.target.value);
+                              newTaxes[index].rate = Number(e.target.value) || 0;
                               handleUpdateStoreSettings('taxes', { taxByState: newTaxes });
                             }}
                             placeholder="0"
@@ -753,7 +750,7 @@ export function ConfiguracoesPage() {
                         variant="outline" 
                         size="sm"
                         onClick={() => {
-                          const newTaxes = [...storeSettings.taxes.taxByState, { state: 'SP', rate: 18 }];
+                          const newTaxes = [...storeSettings.taxes.taxByState, { state: '', rate: 0 }];
                           handleUpdateStoreSettings('taxes', { taxByState: newTaxes });
                         }}
                       >
@@ -764,7 +761,7 @@ export function ConfiguracoesPage() {
                   </div>
 
                   <div className="flex justify-end">
-                    <Button>
+                    <Button onClick={() => saveSection('taxes')} disabled={updateStoreSettingsMutation.isPending}>
                       <Save className="h-4 w-4 mr-2" />
                       Salvar Alterações
                     </Button>
@@ -879,7 +876,7 @@ export function ConfiguracoesPage() {
                   </div>
 
                   <div className="flex justify-end">
-                    <Button>
+                    <Button onClick={() => saveSection('notifications')} disabled={updateStoreSettingsMutation.isPending}>
                       <Save className="h-4 w-4 mr-2" />
                       Salvar Alterações
                     </Button>
@@ -903,7 +900,7 @@ export function ConfiguracoesPage() {
                       id="meta-title"
                       value={storeSettings?.seo.metaTitle}
                       onChange={(e) => handleUpdateStoreSettings('seo', { metaTitle: e.target.value })}
-                      placeholder="Ex: TechStore - Eletrônicos de Qualidade"
+                      placeholder="Ex: Minha Loja - Produtos de qualidade"
                     />
                     <p className="text-sm text-gray-500">
                       Recomendado: até 60 caracteres
@@ -916,7 +913,7 @@ export function ConfiguracoesPage() {
                       id="meta-description"
                       value={storeSettings?.seo.metaDescription}
                       onChange={(e) => handleUpdateStoreSettings('seo', { metaDescription: e.target.value })}
-                      placeholder="Ex: Encontre os melhores produtos eletrônicos com preços competitivos e entrega rápida."
+                      placeholder="Ex: Descreva em uma frase o que sua loja vende"
                       rows={3}
                     />
                     <p className="text-sm text-gray-500">
@@ -930,7 +927,7 @@ export function ConfiguracoesPage() {
                       id="meta-keywords"
                       value={storeSettings?.seo.metaKeywords}
                       onChange={(e) => handleUpdateStoreSettings('seo', { metaKeywords: e.target.value })}
-                      placeholder="Ex: eletrônicos, smartphones, notebooks, tecnologia"
+                      placeholder="Ex: roupas, acessórios, moda feminina"
                     />
                     <p className="text-sm text-gray-500">
                       Separe as palavras-chave por vírgulas
@@ -958,7 +955,7 @@ export function ConfiguracoesPage() {
                   </div>
 
                   <div className="flex justify-end">
-                    <Button>
+                    <Button onClick={() => saveSection('seo')} disabled={updateStoreSettingsMutation.isPending}>
                       <Save className="h-4 w-4 mr-2" />
                       Salvar Alterações
                     </Button>
@@ -967,120 +964,6 @@ export function ConfiguracoesPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="security" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Configurações de Segurança</CardTitle>
-                  <CardDescription>
-                    Configure as opções de segurança da sua loja
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="text-base">Autenticação de Dois Fatores</Label>
-                        <p className="text-sm text-gray-500">
-                          Adiciona uma camada extra de segurança à sua conta
-                        </p>
-                      </div>
-                      <Switch
-                        checked={storeSettings?.security.twoFactorAuth}
-                        onCheckedChange={(checked) => handleUpdateStoreSettings('security', { 
-                          twoFactorAuth: checked 
-                        })}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="session-timeout">Tempo Limite da Sessão (minutos)</Label>
-                      <Input
-                        id="session-timeout"
-                        type="number"
-                        min="5"
-                        step="5"
-                        value={storeSettings?.security.sessionTimeout}
-                        onChange={(e) => handleUpdateStoreSettings('security', { 
-                          sessionTimeout: parseInt(e.target.value) 
-                        })}
-                        placeholder="30"
-                      />
-                      <p className="text-sm text-gray-500">
-                        Tempo de inatividade até o logout automático
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-6 space-y-4">
-                    <h3 className="text-lg font-medium">Política de Senha</h3>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="min-length">Comprimento Mínimo</Label>
-                      <Input
-                        id="min-length"
-                        type="number"
-                        min="6"
-                        max="20"
-                        value={storeSettings?.security.passwordPolicy.minLength}
-                        onChange={(e) => handleUpdateStoreSettings('security', { 
-                          passwordPolicy: {
-                            ...storeSettings.security.passwordPolicy,
-                            minLength: parseInt(e.target.value)
-                          }
-                        })}
-                        placeholder="8"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <Label>Exigir Letras Maiúsculas</Label>
-                      <Switch
-                        checked={storeSettings?.security.passwordPolicy.requireUppercase}
-                        onCheckedChange={(checked) => handleUpdateStoreSettings('security', { 
-                          passwordPolicy: {
-                            ...storeSettings.security.passwordPolicy,
-                            requireUppercase: checked
-                          }
-                        })}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <Label>Exigir Números</Label>
-                      <Switch
-                        checked={storeSettings?.security.passwordPolicy.requireNumbers}
-                        onCheckedChange={(checked) => handleUpdateStoreSettings('security', { 
-                          passwordPolicy: {
-                            ...storeSettings.security.passwordPolicy,
-                            requireNumbers: checked
-                          }
-                        })}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <Label>Exigir Símbolos</Label>
-                      <Switch
-                        checked={storeSettings?.security.passwordPolicy.requireSymbols}
-                        onCheckedChange={(checked) => handleUpdateStoreSettings('security', { 
-                          passwordPolicy: {
-                            ...storeSettings.security.passwordPolicy,
-                            requireSymbols: checked
-                          }
-                        })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button>
-                      <Save className="h-4 w-4 mr-2" />
-                      Salvar Alterações
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
           </Tabs>
         </div>
       </AppShell>

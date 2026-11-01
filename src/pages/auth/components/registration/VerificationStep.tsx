@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, FileText, AlertTriangle, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Upload, FileText, AlertTriangle, AlertCircle, X } from 'lucide-react';
 import { VerificationData } from '../EntrepreneurRegistration';
 
 interface VerificationStepProps {

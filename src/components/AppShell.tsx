@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { 
   Menu, 
   X, 
@@ -12,21 +13,37 @@ import {
   Store,
   ShoppingCart,
   Users,
-  BarChart3,
-  TrendingUp,
   Megaphone,
   FileText,
   CreditCard,
   Settings,
   Zap,
   HelpCircle,
-  ChevronRight,
-  ChevronDown,
   Video,
-  Archive
+  Archive,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { StoreService, type StoreStatus } from '@/services/StoreService';
+
+const STATUS_BANNER: Partial<Record<StoreStatus, { title: string; text: string; className: string }>> = {
+  PENDENTE: {
+    title: 'Loja em análise',
+    text: 'Sua loja aguarda aprovação da equipe NEOX. Enquanto isso, ela não aparece para os clientes.',
+    className: 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-200',
+  },
+  REJEITADA: {
+    title: 'Loja rejeitada',
+    text: 'O cadastro da sua loja não foi aprovado. Corrija os dados e envie novos documentos.',
+    className: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950/40 dark:text-red-200',
+  },
+  SUSPENSA: {
+    title: 'Loja suspensa',
+    text: 'Sua loja está suspensa e não aparece para os clientes.',
+    className: 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950/40 dark:text-red-200',
+  },
+};
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -38,6 +55,12 @@ export function AppShell({ children }: AppShellProps) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { data: store } = useQuery({
+    queryKey: ['store'],
+    queryFn: StoreService.getStore,
+    enabled: user?.role === 'EMPREENDEDOR',
+  });
+  const banner = store ? STATUS_BANNER[store.status] : undefined;
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
@@ -180,6 +203,19 @@ export function AppShell({ children }: AppShellProps) {
             </div>
           </div>
         </header>
+
+        {banner && store && (
+          <div className={`border-b px-4 sm:px-6 lg:px-8 py-3 flex items-start gap-3 text-sm ${banner.className}`} role="status">
+            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <span className="font-semibold">{banner.title}.</span> {banner.text}
+              {store.statusReason && <div className="mt-1">Motivo: {store.statusReason}</div>}
+            </div>
+            {location.pathname !== '/painel/perfil' && (
+              <Link to="/painel/perfil" className="font-medium underline shrink-0">Ver perfil da loja</Link>
+            )}
+          </div>
+        )}
 
         {/* Page content */}
         <main className="flex-1">

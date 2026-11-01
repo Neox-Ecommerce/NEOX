@@ -27,46 +27,53 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DashboardService } from '@/services/DashboardService';
 import { ProductService } from '@/services/ProductService';
-import { useAuth } from '@/contexts/AuthContext';
+import { toCsvBlob } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const [chartPeriod, setChartPeriod] = useState(30);
 
   const { data: overview, isLoading: overviewLoading } = useQuery({
-    queryKey: ['dashboard-overview', user?.lojaId],
-    queryFn: () => DashboardService.fetchOverview(user?.lojaId || '1')
+    queryKey: ['dashboard-overview'],
+    queryFn: DashboardService.fetchOverview
   });
 
   const { data: chartData, isLoading: chartLoading } = useQuery({
-    queryKey: ['dashboard-chart', user?.lojaId],
-    queryFn: () => DashboardService.fetchChartData(30, user?.lojaId || '1')
+    queryKey: ['dashboard-chart', chartPeriod],
+    queryFn: () => DashboardService.fetchChartData(chartPeriod)
   });
 
   const { data: recentOrders, isLoading: ordersLoading } = useQuery({
-    queryKey: ['recent-orders', user?.lojaId],
-    queryFn: () => DashboardService.fetchRecentOrders(user?.lojaId || '1')
+    queryKey: ['recent-orders'],
+    queryFn: DashboardService.fetchRecentOrders
   });
 
   const { data: featuredProducts, isLoading: productsLoading } = useQuery({
-    queryKey: ['featured-products', user?.lojaId],
-    queryFn: () => DashboardService.fetchFeaturedProducts(user?.lojaId || '1')
+    queryKey: ['featured-products'],
+    queryFn: DashboardService.fetchFeaturedProducts
   });
 
   const { data: productStats } = useQuery({
-    queryKey: ['product-stats', user?.lojaId],
-    queryFn: () => ProductService.getProductStats(user?.lojaId || '1')
+    queryKey: ['product-stats'],
+    queryFn: () => ProductService.getProductStats()
   });
 
   const handleExportCSV = () => {
-    // Implementar exportação CSV
-    console.log('Exportando CSV...');
+    const blob = toCsvBlob([
+      ['Data', 'Receita (R$)', 'Visitas'],
+      ...(chartData ?? []).map((d) => [d.date, d.receita.toFixed(2), d.visitas]),
+    ]);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dashboard-${chartPeriod}-dias.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleGenerateCoupon = () => {
-    // Implementar geração de cupom
-    console.log('Gerando cupom...');
+    navigate('/painel/marketing');
   };
 
   const handleCreateTrend = () => {
@@ -169,7 +176,7 @@ export function Dashboard() {
                 <>
                   <MetricCard
                     title="Produtos"
-                    value={productStats?.total || 0}
+                    value={productStats?.total ?? overview?.produtos ?? 0}
                     icon={Package}
                   />
                   
@@ -202,6 +209,8 @@ export function Dashboard() {
               <RevenueChart 
                 data={chartData || []} 
                 isLoading={chartLoading}
+                period={chartPeriod}
+                onPeriodChange={setChartPeriod}
               />
             </div>
 
@@ -240,9 +249,9 @@ export function Dashboard() {
                   
                   <MetricCard
                     title="Estoque Baixo"
-                    value={productStats?.estoqueBaixo || 0}
+                    value={overview?.estoqueBaixo || 0}
                     icon={AlertTriangle}
-                    className={productStats?.estoqueBaixo && productStats.estoqueBaixo > 0 ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950' : ''}
+                    className={overview?.estoqueBaixo ? 'border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950' : ''}
                   />
                 </>
               )}
@@ -268,9 +277,13 @@ export function Dashboard() {
                         </div>
                       ))}
                     </div>
+                  ) : !recentOrders?.length ? (
+                    <p className="text-sm text-muted-foreground py-6 text-center">
+                      Nenhum pedido recebido ainda.
+                    </p>
                   ) : (
                     <div className="space-y-3">
-                      {recentOrders?.slice(0, 5).map((order) => (
+                      {recentOrders.slice(0, 5).map((order) => (
                         <div key={order.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
                           <div>
                             <p className="font-medium text-gray-900 dark:text-white">
@@ -311,18 +324,25 @@ export function Dashboard() {
                         </div>
                       ))}
                     </div>
+                  ) : !featuredProducts?.length ? (
+                    <p className="text-sm text-muted-foreground py-6 text-center">
+                      Nenhuma venda paga nos últimos 30 dias.
+                    </p>
                   ) : (
                     <div className="space-y-3">
-                      {featuredProducts?.map((product, index) => (
+                      {featuredProducts.map((product, index) => (
                         <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
                           <div>
                             <p className="font-medium text-gray-900 dark:text-white">
                               {product.name}
                             </p>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {product.sales} vendas
+                              {product.sales} {product.sales === 1 ? 'unidade vendida' : 'unidades vendidas'} (30 dias)
                             </p>
                           </div>
+                          {product.variation === 0 ? (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          ) : (
                           <div className="flex items-center gap-1">
                             <span className={`text-sm font-medium ${
                               product.variation > 0 
@@ -337,6 +357,7 @@ export function Dashboard() {
                               <ArrowDownRight className="h-3 w-3 text-red-600 dark:text-red-400" />
                             )}
                           </div>
+                          )}
                         </div>
                       ))}
                     </div>
