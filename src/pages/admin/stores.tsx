@@ -1,862 +1,173 @@
-import { useEffect, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  Store, 
-  Eye, 
-  Check, 
-  X, 
-  Search, 
-  Filter,
-  AlertTriangle,
-  Ban,
-  MessageSquare,
-  Mail,
-  Phone,
-  FileText,
-  LogOut,
-  ChevronDown,
-  Shield,
-  ShoppingBag,
-  Video
-} from 'lucide-react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { ChevronRight, Search, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RoleGuard } from '@/components/RoleGuard';
-import { FeedbackService } from '@/services/FeedbackService';
-import { useAuth } from '@/contexts/AuthContext';
-import { AdminService, AdminStore, StoreStatus } from '@/services/AdminService';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyState, PageHeader, QueryState } from '@/components/PageStates';
+import { StatusBadge } from '@/components/StatusBadge';
+import { AdminService, type AdminStore } from '@/services/AdminService';
+import { formatDate } from './labels';
+
+const TABS = [
+  { value: 'PENDENTE', label: 'Em análise' },
+  { value: 'todas', label: 'Todas' },
+  { value: 'APROVADA', label: 'Aprovadas' },
+  { value: 'SUSPENSA', label: 'Suspensas' },
+  { value: 'REJEITADA', label: 'Rejeitadas' },
+];
+
+const matches = (s: AdminStore, term: string) =>
+  [s.nomeFantasia, s.razaoSocial, s.cnpj, s.owner, s.email].some((v) => v.toLowerCase().includes(term));
 
 export function AdminStoresPage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedStore, setSelectedStore] = useState<AdminStore | null>(null);
-  const [actionType, setActionType] = useState<'approve' | 'reject' | 'suspend' | 'warn' | null>(null);
-  const [actionReason, setActionReason] = useState('');
-  const [actionModalOpen, setActionModalOpen] = useState(false);
-  const [storeDetailsOpen, setStoreDetailsOpen] = useState(false);
-  const [userSwitcherOpen, setUserSwitcherOpen] = useState(false);
-  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('status') ?? 'PENDENTE'; // fila "Em análise" primeiro
+  const q = params.get('q') ?? '';
+  const query = useQuery({ queryKey: ['admin-stores'], queryFn: () => AdminService.getStores() });
 
-  const { user, logout } = useAuth();
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { todas: query.data?.length ?? 0 };
+    query.data?.forEach((s) => { c[s.status] = (c[s.status] ?? 0) + 1; });
+    return c;
+  }, [query.data]);
 
-  // Filtros aplicados no cliente sobre a lista completa (os cards de resumo usam o total)
-  const { data: storesData, isLoading, isError } = useQuery({
-    queryKey: ['admin-stores'],
-    queryFn: () => AdminService.getStores(),
-  });
-  const stores = storesData ?? [];
+  // Links antigos /admin/lojas?storeId=… agora vão para a página de detalhe
+  const legacyId = params.get('storeId');
+  if (legacyId) return <Navigate to={`/admin/lojas/${legacyId}`} replace />;
 
-  // mantém o modal de detalhes em sincronia após ações (documentos, status)
-  useEffect(() => {
-    setSelectedStore((prev) => (prev && storesData?.find((s) => s.id === prev.id)) || prev);
-  }, [storesData]);
-
-  // /admin/lojas?storeId=... (link "Ver Loja" da tela de vídeos) abre os detalhes da loja
-  const [searchParams, setSearchParams] = useSearchParams();
-  useEffect(() => {
-    const target = searchParams.get('storeId') && storesData?.find((s) => s.id === searchParams.get('storeId'));
-    if (target) {
-      setSelectedStore(target);
-      setStoreDetailsOpen(true);
-      setSearchParams({}, { replace: true });
-    }
-  }, [storesData, searchParams, setSearchParams]);
-
-  const updateStoreMutation = useMutation({
-    mutationFn: AdminService.updateStoreStatus,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
-      FeedbackService.success(`Loja ${data.status.toLowerCase()} com sucesso!`);
-      setSelectedStore(null);
-      setActionType(null);
-      setActionModalOpen(false);
-      setActionReason('');
-    },
-    onError: (error: Error) => {
-      FeedbackService.error(error.message || 'Erro ao atualizar status da loja');
-    }
-  });
-
-  const addWarningMutation = useMutation({
-    mutationFn: AdminService.addWarning,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
-      FeedbackService.success('Advertência enviada com sucesso!');
-      setSelectedStore(null);
-      setActionType(null);
-      setActionModalOpen(false);
-      setActionReason('');
-    },
-    onError: (error: Error) => {
-      FeedbackService.error(error.message || 'Erro ao enviar advertência');
-    }
-  });
-
-  const documentMutation = useMutation({
-    mutationFn: AdminService.updateDocumentStatus,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-stores'] });
-      FeedbackService.success('Documento atualizado!');
-    },
-    onError: (error: Error) => {
-      FeedbackService.error(error.message || 'Erro ao atualizar documento');
-    }
-  });
-
-  const handleAction = (store: AdminStore, action: 'approve' | 'reject' | 'suspend' | 'warn') => {
-    setSelectedStore(store);
-    setActionType(action);
-    setActionModalOpen(true);
-  };
-
-  const confirmAction = () => {
-    if (!selectedStore || !actionType) return;
-
-    if (actionType === 'warn') {
-      if (!actionReason) {
-        FeedbackService.error('Informe o motivo da advertência');
-        return;
-      }
-      
-      addWarningMutation.mutate({
-        storeId: selectedStore.id,
-        motivo: actionReason
-      });
-      return;
-    }
-
-    const statusMap: Record<'approve' | 'reject' | 'suspend', StoreStatus> = {
-      approve: 'APROVADA',
-      reject: 'REJEITADA',
-      suspend: 'SUSPENSA'
-    };
-
-    if ((actionType === 'reject' || actionType === 'suspend') && !actionReason) {
-      FeedbackService.error('Informe o motivo da ação');
-      return;
-    }
-
-    updateStoreMutation.mutate({
-      storeId: selectedStore.id,
-      status: statusMap[actionType],
-      reason: actionReason
-    });
-  };
-
-  const handleViewStore = (store: AdminStore) => {
-    setSelectedStore(store);
-    setStoreDetailsOpen(true);
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      'PENDENTE': { variant: 'warning' as const, label: 'Pendente' },
-      'APROVADA': { variant: 'success' as const, label: 'Aprovada' },
-      'REJEITADA': { variant: 'destructive' as const, label: 'Rejeitada' },
-      'SUSPENSA': { variant: 'secondary' as const, label: 'Suspensa' }
-    };
-
-    const config = variants[status as keyof typeof variants] || variants.PENDENTE;
-
-    return (
-      <Badge variant={config.variant}>
-        {config.label}
-      </Badge>
-    );
-  };
-
-  const getDocumentStatusBadge = (status: string) => {
-    const variants = {
-      'PENDENTE': { variant: 'warning' as const, label: 'Pendente' },
-      'VERIFICADO': { variant: 'success' as const, label: 'Verificado' },
-      'REJEITADO': { variant: 'destructive' as const, label: 'Rejeitado' }
-    };
-
-    const config = variants[status as keyof typeof variants] || variants.PENDENTE;
-
-    return (
-      <Badge variant={config.variant}>
-        {config.label}
-      </Badge>
-    );
-  };
-
-  const filteredStores = stores.filter(store => {
-    const matchesSearch = searchQuery === '' ||
-      store.nomeFantasia.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      store.razaoSocial.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      store.cnpj.includes(searchQuery) ||
-      store.owner.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      store.email.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesStatus = statusFilter === 'all' || store.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
-  });
-
-  const getActionText = () => {
-    switch (actionType) {
-      case 'approve': return 'aprovar';
-      case 'reject': return 'rejeitar';
-      case 'suspend': return 'suspender';
-      case 'warn': return 'advertir';
-      default: return '';
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/admin/login');
-  };
-
-  const handleSwitchUser = (role: string) => {
-    setUserSwitcherOpen(false);
-    
-    if (role === 'admin') {
-      // Already in admin
-      return;
-    } else if (role === 'empreendedor') {
-      navigate('/painel/dashboard');
-    } else if (role === 'cliente') {
-      navigate('/cliente');
-    } else {
-      navigate('/auth');
-    }
+  const setParam = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next, { replace: true });
   };
 
   return (
-    <RoleGuard requiredRole="ADMIN">
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <header className="bg-white shadow-sm border-b sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center space-x-4">
-                <Link to="/admin/lojas" className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-xl font-bold text-gray-900">NeoxStore Admin</span>
-                </Link>
-              </div>
+    <div>
+      <PageHeader title="Lojas" description="Aprove novas lojas, acompanhe documentos e modere quem vende na plataforma." />
 
-              <div className="flex items-center space-x-4">
-                <Tabs defaultValue="stores" className="w-[400px]">
-                  <TabsList>
-                    <TabsTrigger value="stores" asChild>
-                      <Link to="/admin/lojas" className="flex items-center gap-2">
-                        <Store className="h-4 w-4" />
-                        <span>Lojas</span>
-                      </Link>
-                    </TabsTrigger>
-                    <TabsTrigger value="videos" asChild>
-                      <Link to="/admin/videos" className="flex items-center gap-2">
-                        <Video className="h-4 w-4" />
-                        <span>Vídeos</span>
-                      </Link>
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-
-                <DropdownMenu open={userSwitcherOpen} onOpenChange={setUserSwitcherOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="flex items-center gap-2">
-                      <div className="flex flex-col items-start">
-                        <span className="text-sm font-medium">{user?.name}</span>
-                        <span className="text-xs text-muted-foreground">Administrador</span>
-                      </div>
-                      <ChevronDown className="h-4 w-4 opacity-50" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem className="flex items-center gap-2" onSelect={() => handleSwitchUser('admin')}>
-                      <Shield className="h-4 w-4" />
-                      <div className="flex flex-col">
-                        <span>Administrador</span>
-                        <span className="text-xs text-muted-foreground">Gerenciar plataforma</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="flex items-center gap-2" onSelect={() => handleSwitchUser('empreendedor')}>
-                      <Store className="h-4 w-4" />
-                      <div className="flex flex-col">
-                        <span>Empreendedor</span>
-                        <span className="text-xs text-muted-foreground">Gerenciar loja</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="flex items-center gap-2" onSelect={() => handleSwitchUser('cliente')}>
-                      <ShoppingBag className="h-4 w-4" />
-                      <div className="flex flex-col">
-                        <span>Cliente</span>
-                        <span className="text-xs text-muted-foreground">Comprar produtos</span>
-                      </div>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="flex items-center gap-2 text-red-600" onSelect={() => setLogoutConfirmOpen(true)}>
-                      <LogOut className="h-4 w-4" />
-                      <span>Sair</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Page Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Supervisão de Lojas</h1>
-            <p className="text-gray-600 mt-1">
-              Supervisione e modere as lojas da plataforma para garantir qualidade aos clientes
-            </p>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Total de Lojas</p>
-                    <p className="text-2xl font-bold text-gray-900">{stores.length}</p>
-                  </div>
-                  <Store className="h-8 w-8 text-primary" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Pendentes</p>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {stores.filter(s => s.status === 'PENDENTE').length}
-                    </p>
-                  </div>
-                  <Eye className="h-8 w-8 text-yellow-600" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Aprovadas</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {stores.filter(s => s.status === 'APROVADA').length}
-                    </p>
-                  </div>
-                  <Check className="h-8 w-8 text-green-600" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Suspensas</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {stores.filter(s => s.status === 'SUSPENSA').length}
-                    </p>
-                  </div>
-                  <Ban className="h-8 w-8 text-red-600" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Buscar lojas..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
-                <SelectItem value="PENDENTE">Pendente</SelectItem>
-                <SelectItem value="APROVADA">Aprovada</SelectItem>
-                <SelectItem value="REJEITADA">Rejeitada</SelectItem>
-                <SelectItem value="SUSPENSA">Suspensa</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Stores Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Lojas ({filteredStores.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Loja</TableHead>
-                    <TableHead>Proprietário</TableHead>
-                    <TableHead>CNPJ</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Data de Criação</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(isLoading || isError || filteredStores.length === 0) && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                        {isLoading ? 'Carregando lojas...' : isError ? 'Erro ao carregar lojas' : 'Nenhuma loja encontrada'}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {filteredStores.map((store) => (
-                    <TableRow key={store.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium text-gray-900">{store.nomeFantasia}</div>
-                          <div className="text-sm text-gray-500">{store.email}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{store.owner}</TableCell>
-                      <TableCell className="font-mono text-sm">{store.cnpj}</TableCell>
-                      <TableCell>{getStatusBadge(store.status)}</TableCell>
-                      <TableCell>{store.createdAt.toLocaleDateString('pt-BR')}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          {store.status === 'PENDENTE' && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAction(store, 'approve')}
-                                className="text-green-600 hover:text-green-700"
-                              >
-                                <Check className="h-4 w-4 mr-1" />
-                                Aprovar
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAction(store, 'reject')}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <X className="h-4 w-4 mr-1" />
-                                Rejeitar
-                              </Button>
-                            </>
-                          )}
-                          {store.status === 'APROVADA' && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAction(store, 'warn')}
-                                className="text-yellow-600 hover:text-yellow-700"
-                              >
-                                <AlertTriangle className="h-4 w-4 mr-1" />
-                                Advertir
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleAction(store, 'suspend')}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <Ban className="h-4 w-4 mr-1" />
-                                Suspender
-                              </Button>
-                            </>
-                          )}
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => handleViewStore(store)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          {/* Store Details Modal */}
-          <Dialog open={storeDetailsOpen} onOpenChange={setStoreDetailsOpen}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Detalhes da Loja</DialogTitle>
-                <DialogDescription>
-                  Informações completas da loja
-                </DialogDescription>
-              </DialogHeader>
-
-              {selectedStore && (
-                <div className="space-y-6">
-                  {/* Store Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Informações Básicas</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Nome Fantasia</p>
-                          <p className="font-medium">{selectedStore.nomeFantasia}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Razão Social</p>
-                          <p className="font-medium">{selectedStore.razaoSocial}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">CNPJ</p>
-                          <p className="font-medium">{selectedStore.cnpj}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Status</p>
-                          <div className="mt-1">{getStatusBadge(selectedStore.status)}</div>
-                          {selectedStore.statusReason && (
-                            <p className="text-sm text-gray-500 mt-1">Motivo: {selectedStore.statusReason}</p>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">CNPJ verificado</p>
-                          <p className="font-medium">{selectedStore.cnpjVerificado ? 'Sim' : 'Não'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Data de Criação</p>
-                          <p className="font-medium">{selectedStore.createdAt.toLocaleDateString('pt-BR')}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">Contato</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Proprietário</p>
-                          <p className="font-medium">{selectedStore.owner}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Email</p>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{selectedStore.email}</p>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
-                              <a href={`mailto:${selectedStore.email}`} aria-label="Enviar email">
-                                <Mail className="h-4 w-4" />
-                              </a>
-                            </Button>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Telefone</p>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{selectedStore.telefone || 'Não informado'}</p>
-                            {selectedStore.telefone && (
-                              <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
-                                <a href={`tel:${selectedStore.telefone}`} aria-label="Ligar">
-                                  <Phone className="h-4 w-4" />
-                                </a>
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        <div className="pt-2">
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={`mailto:${selectedStore.email}`}>
-                              <MessageSquare className="h-4 w-4 mr-2" />
-                              Enviar Mensagem
-                            </a>
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Documents */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Documentos</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {selectedStore.documentos.length === 0 && (
-                          <p className="text-sm text-gray-500">Nenhum documento enviado</p>
-                        )}
-                        {selectedStore.documentos.map((doc) => (
-                          <div key={doc.id} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <FileText className="h-5 w-5 text-gray-400" />
-                              <div>
-                                <p className="font-medium">{doc.tipo}</p>
-                                <p className="text-sm text-gray-500">
-                                  Enviado em {doc.dataEnvio.toLocaleDateString('pt-BR')}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {getDocumentStatusBadge(doc.status)}
-                              {doc.status !== 'VERIFICADO' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-green-600"
-                                  disabled={documentMutation.isPending}
-                                  onClick={() => documentMutation.mutate({ documentId: doc.id, status: 'VERIFICADO' })}
-                                >
-                                  <Check className="h-4 w-4 mr-1" />
-                                  Verificar
-                                </Button>
-                              )}
-                              {doc.status === 'PENDENTE' && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-red-600"
-                                  disabled={documentMutation.isPending}
-                                  onClick={() => documentMutation.mutate({ documentId: doc.id, status: 'REJEITADO' })}
-                                >
-                                  <X className="h-4 w-4 mr-1" />
-                                  Rejeitar
-                                </Button>
-                              )}
-                              <Button variant="outline" size="sm" onClick={() => window.open(doc.url, '_blank')}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                Visualizar
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Warnings */}
-                  {selectedStore.advertencias.length > 0 && (
-                    <Card className="border-yellow-200 bg-yellow-50">
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2 text-yellow-800">
-                          <AlertTriangle className="h-5 w-5" />
-                          Advertências
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          {selectedStore.advertencias.map((adv) => (
-                            <div key={adv.id} className="p-4 border border-yellow-200 rounded-lg bg-white">
-                              <div className="flex items-start gap-3">
-                                <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                                <div>
-                                  <p className="font-medium">{adv.motivo}</p>
-                                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                                    <p>Data: {adv.data.toLocaleDateString('pt-BR')}</p>
-                                    <Badge variant={adv.resolvido ? 'success' : 'warning'}>
-                                      {adv.resolvido ? 'Resolvido' : 'Pendente'}
-                                    </Badge>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex justify-end space-x-3">
-                    <Button variant="outline" onClick={() => setStoreDetailsOpen(false)}>
-                      Fechar
-                    </Button>
-                    {selectedStore.status === 'PENDENTE' && (
-                      <>
-                        <Button 
-                          variant="outline" 
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => {
-                            setStoreDetailsOpen(false);
-                            handleAction(selectedStore, 'reject');
-                          }}
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Rejeitar
-                        </Button>
-                        <Button 
-                          onClick={() => {
-                            setStoreDetailsOpen(false);
-                            handleAction(selectedStore, 'approve');
-                          }}
-                        >
-                          <Check className="h-4 w-4 mr-2" />
-                          Aprovar
-                        </Button>
-                      </>
-                    )}
-                    {selectedStore.status === 'APROVADA' && (
-                      <>
-                        <Button 
-                          variant="outline"
-                          onClick={() => {
-                            setStoreDetailsOpen(false);
-                            handleAction(selectedStore, 'warn');
-                          }}
-                        >
-                          <AlertTriangle className="h-4 w-4 mr-2" />
-                          Advertir
-                        </Button>
-                        <Button 
-                          variant="destructive"
-                          onClick={() => {
-                            setStoreDetailsOpen(false);
-                            handleAction(selectedStore, 'suspend');
-                          }}
-                        >
-                          <Ban className="h-4 w-4 mr-2" />
-                          Suspender
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
-
-          {/* Action Confirmation Modal */}
-          <Dialog open={actionModalOpen} onOpenChange={setActionModalOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Confirmar Ação</DialogTitle>
-                <DialogDescription>
-                  {selectedStore && (
-                    <>
-                      Tem certeza que deseja {getActionText()} a loja "{selectedStore.nomeFantasia}"?
-                      {(actionType === 'reject' || actionType === 'suspend') && (
-                        <> Esta ação pode afetar a capacidade da loja de operar na plataforma.</>
-                      )}
-                    </>
-                  )}
-                </DialogDescription>
-              </DialogHeader>
-
-              {(actionType === 'reject' || actionType === 'suspend' || actionType === 'warn') && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="reason">Motivo (obrigatório)</Label>
-                    <Textarea
-                      id="reason"
-                      value={actionReason}
-                      onChange={(e) => setActionReason(e.target.value)}
-                      placeholder={`Informe o motivo para ${getActionText()} a loja...`}
-                      rows={3}
-                    />
-                  </div>
-                  
-                  {actionType === 'warn' && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <div className="flex items-start gap-2">
-                        <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium text-yellow-800">
-                            Informações sobre advertências
-                          </p>
-                          <ul className="text-sm text-yellow-700 mt-1 space-y-1 list-disc list-inside">
-                            <li>A advertência fica registrada no cadastro da loja</li>
-                            <li>Múltiplas advertências podem resultar em suspensão</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => {
-                  setActionModalOpen(false);
-                  setActionReason('');
-                }}>
-                  Cancelar
-                </Button>
-                <Button 
-                  onClick={confirmAction}
-                  disabled={(actionType === 'reject' || actionType === 'suspend' || actionType === 'warn') && !actionReason}
-                  variant={actionType === 'approve' ? 'default' : 'destructive'}
-                >
-                  {updateStoreMutation.isPending || addWarningMutation.isPending
-                    ? 'Processando...' 
-                    : `Confirmar ${getActionText()}`}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Logout Confirmation Dialog */}
-          <Dialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Confirmar Logout</DialogTitle>
-                <DialogDescription>
-                  Tem certeza que deseja sair do painel administrativo?
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setLogoutConfirmOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button variant="destructive" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Confirmar Logout
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <Tabs value={tab} onValueChange={(v) => setParam('status', v)}>
+          <TabsList className="h-auto flex-wrap justify-start">
+            {TABS.map((t) => (
+              <TabsTrigger key={t.value} value={t.value} className="min-h-10">
+                {t.label}
+                <span className="ml-1.5 rounded-full bg-muted px-1.5 text-xs text-muted-foreground">{counts[t.value] ?? 0}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <div className="relative w-full lg:w-80">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            type="search"
+            aria-label="Buscar lojas"
+            placeholder="Nome, CNPJ, dono ou e-mail"
+            value={q}
+            onChange={(e) => setParam('q', e.target.value)}
+            className="h-11 rounded-full pl-9"
+          />
         </div>
       </div>
-    </RoleGuard>
+
+      <QueryState query={query}>
+        {(stores) => {
+          const term = q.trim().toLowerCase();
+          const rows = stores.filter((s) => (tab === 'todas' || s.status === tab) && (!term || matches(s, term)));
+          if (rows.length === 0) {
+            return (
+              <EmptyState
+                icon={Store}
+                title={term ? 'Nenhuma loja encontrada' : tab === 'PENDENTE' ? 'Nenhuma loja em análise' : 'Nenhuma loja aqui'}
+                description={term ? 'Tente outro termo de busca.' : tab === 'PENDENTE' ? 'A fila de aprovação está em dia.' : undefined}
+                action={(term || tab !== 'todas') && (
+                  <Button variant="outline" onClick={() => setParams({ status: 'todas' }, { replace: true })}>Ver todas as lojas</Button>
+                )}
+              />
+            );
+          }
+          return (
+            <>
+              {/* Celular: cards */}
+              <ul className="space-y-3 md:hidden">
+                {rows.map((s) => (
+                  <li key={s.id}>
+                    <Link to={`/admin/lojas/${s.id}`} className="block rounded-lg border bg-card p-4 hover:border-admin/40">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{s.nomeFantasia}</p>
+                          <p className="truncate text-sm text-muted-foreground">{s.owner} · {s.email}</p>
+                        </div>
+                        <StatusBadge kind="store" value={s.status} />
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        CNPJ {s.cnpj} · {s.segmento} · desde {formatDate(s.createdAt)}
+                        {s.documentos.some((d) => d.status === 'PENDENTE') && ' · documentos pendentes'}
+                      </p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Desktop: tabela */}
+              <Card className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Loja</TableHead>
+                      <TableHead>Responsável</TableHead>
+                      <TableHead>CNPJ</TableHead>
+                      <TableHead>Documentos</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Cadastro</TableHead>
+                      <TableHead><span className="sr-only">Abrir</span></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((s) => {
+                      const pendingDocs = s.documentos.filter((d) => d.status === 'PENDENTE').length;
+                      return (
+                        <TableRow key={s.id}>
+                          <TableCell>
+                            <Link to={`/admin/lojas/${s.id}`} className="font-medium hover:text-admin hover:underline">{s.nomeFantasia}</Link>
+                            <p className="text-xs text-muted-foreground">{s.segmento}</p>
+                          </TableCell>
+                          <TableCell>
+                            <p>{s.owner}</p>
+                            <p className="text-xs text-muted-foreground">{s.email}</p>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {s.cnpj}
+                            {s.cnpjVerificado && <span className="ml-1 text-xs text-success">(verificado)</span>}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {s.documentos.length === 0 ? <span className="text-muted-foreground">Nenhum</span>
+                              : pendingDocs > 0 ? <span className="text-warning">{pendingDocs} a verificar</span>
+                              : `${s.documentos.length} enviado(s)`}
+                          </TableCell>
+                          <TableCell><StatusBadge kind="store" value={s.status} /></TableCell>
+                          <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{formatDate(s.createdAt)}</TableCell>
+                          <TableCell>
+                            <Button asChild variant="ghost" size="sm">
+                              <Link to={`/admin/lojas/${s.id}`} aria-label={`Abrir ${s.nomeFantasia}`}>
+                                {s.status === 'PENDENTE' ? 'Analisar' : 'Abrir'} <ChevronRight className="ml-1 h-4 w-4" aria-hidden="true" />
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </Card>
+            </>
+          );
+        }}
+      </QueryState>
+    </div>
   );
 }

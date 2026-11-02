@@ -23,6 +23,7 @@ export interface ChartData {
 
 export interface RecentOrder {
   id: string;
+  code: string; // número exibido (#000123)
   time: string;
   value: number;
 }

@@ -3,49 +3,86 @@
 @tailwind utilities;
 
 @layer base {
+  /* Tokens do design system NEOX (HSL sem hsl()). Pares texto/fundo com contraste >= 4,5:1 (WCAG AA). */
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 142 69% 48%;
-    --primary-foreground: 210 40% 98%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 132 75% 27%;            /* verde da logo escurecido para contraste com branco */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 132 75% 22%;
+    --primary-muted: 130 60% 94%;
+    --brand: 70 100% 63%;              /* #E0FF41, lima do anel (decorativo) */
+    --brand-2: 158 99% 55%;            /* #1DFEAB, verde-água do anel (decorativo) */
+    --success: 132 75% 27%;
+    --success-foreground: 0 0% 100%;
+    --success-muted: 130 60% 94%;
+    --warning: 26 90% 37%;             /* #B45309, 5,0:1 */
+    --warning-foreground: 0 0% 100%;
+    --warning-muted: 48 96% 93%;
+    --info: 224 76% 48%;               /* #1D4ED8, 6,7:1 */
+    --info-foreground: 0 0% 100%;
+    --info-muted: 214 95% 95%;
+    --admin: 243 75% 59%;              /* #4F46E5, 6,3:1, destaque da área admin */
+    --admin-foreground: 0 0% 100%;
+    --admin-muted: 226 100% 96%;
     --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
+    --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted-foreground: 215 16% 40%;   /* 6,1:1 com branco */
     --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 142 69% 48%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 74% 42%;          /* #B91C1C, 6,5:1 */
+    --destructive-foreground: 0 0% 100%;
+    --destructive-muted: 0 86% 97%;
+    --border: 214 32% 89%;
+    --input: 214 32% 80%;
+    --ring: 132 75% 27%;
     --radius: 0.5rem;
   }
 
+  /* Tema escuro (padrão): cores tiradas da logo. Fundo verde quase preto (#001300 na logo),
+     verde #2FDD4C das letras como cor principal, lima #E0FF41 e verde-água #1DFEAB no gradiente do anel. */
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 142 69% 48%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 142 69% 48%;
+    --background: 140 45% 4%;
+    --foreground: 90 25% 95%;
+    --card: 140 35% 7%;
+    --card-foreground: 90 25% 95%;
+    --popover: 140 35% 8%;
+    --popover-foreground: 90 25% 95%;
+    --primary: 130 72% 53%;            /* #2FDD4C, verde das letras */
+    --primary-foreground: 120 100% 4%; /* #001300, fundo da logo */
+    --primary-hover: 130 72% 62%;
+    --primary-muted: 135 45% 12%;
+    --brand: 70 100% 63%;              /* #E0FF41, lima do anel */
+    --brand-2: 158 99% 55%;            /* #1DFEAB, verde-água do anel */
+    --success: 130 72% 53%;
+    --success-foreground: 120 100% 4%;
+    --success-muted: 135 45% 12%;
+    --warning: 45 95% 60%;
+    --warning-foreground: 120 100% 4%;
+    --warning-muted: 40 50% 12%;
+    --info: 175 85% 55%;
+    --info-foreground: 120 100% 4%;
+    --info-muted: 175 45% 11%;
+    --admin: 234 89% 76%;
+    --admin-foreground: 230 60% 8%;
+    --admin-muted: 235 35% 16%;
+    --secondary: 140 25% 11%;
+    --secondary-foreground: 90 25% 95%;
+    --muted: 140 25% 11%;
+    --muted-foreground: 110 10% 70%;
+    --accent: 140 25% 13%;
+    --accent-foreground: 90 25% 95%;
+    --destructive: 0 85% 67%;
+    --destructive-foreground: 120 100% 4%;
+    --destructive-muted: 0 45% 13%;
+    --border: 140 20% 16%;
+    --input: 140 18% 24%;
+    --ring: 130 72% 53%;
   }
 }
 
@@ -54,7 +91,19 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+  }
+  /* foco visível em qualquer elemento navegável por teclado */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -302,4 +351,16 @@ button:active {
 
 body {
   overflow-x: hidden;
+}
+/* Gradiente do anel da logo (lima -> verde -> verde-água). Uso decorativo: títulos de destaque e faixas. */
+@layer utilities {
+  .text-brand-gradient {
+    background-image: linear-gradient(90deg, hsl(var(--brand)), hsl(var(--primary)) 55%, hsl(var(--brand-2)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .bg-brand-gradient {
+    background-image: linear-gradient(135deg, hsl(var(--brand)), hsl(var(--primary)) 55%, hsl(var(--brand-2)));
+  }
 }

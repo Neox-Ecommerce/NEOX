@@ -1,146 +1,64 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft } from 'lucide-react';
-import { AppShell } from '@/components/AppShell';
-import { RoleGuard } from '@/components/RoleGuard';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ProductForm } from '@/components/ProductForm';
 import { Button } from '@/components/ui/button';
-import { ProductService, CreateProductData } from '@/services/ProductService';
+import { Card } from '@/components/ui/card';
+import { EmptyState, PageHeader, PageLoader } from '@/components/PageStates';
+import { ProductService, type CreateProductData } from '@/services/ProductService';
 import { FeedbackService } from '@/services/FeedbackService';
 
 export function ProductFormPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const isEdit = id && id !== 'novo';
+  const isEdit = !!id && id !== 'novo';
 
   const { data: product, isLoading } = useQuery({
     queryKey: ['product', id],
     queryFn: () => ProductService.getById(id!),
-    enabled: !!isEdit
+    enabled: isEdit,
   });
 
-  const createMutation = useMutation({
-    mutationFn: (data: CreateProductData) => ProductService.create(data),
+  const mutation = useMutation({
+    mutationFn: (data: CreateProductData) => (isEdit ? ProductService.update(id!, data) : ProductService.create(data)),
     onSuccess: () => {
-      FeedbackService.success('Produto criado com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['category-counts'] });
-      queryClient.invalidateQueries({ queryKey: ['product-stats'] });
+      FeedbackService.success(isEdit ? 'Produto atualizado.' : 'Produto cadastrado.');
+      ['products', 'product', 'category-counts', 'product-stats', 'inventory'].forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
       navigate('/painel/produtos');
     },
-    onError: (error: Error) => {
-      FeedbackService.error('Erro ao criar produto', error.message);
-    }
+    onError: (error: Error) => FeedbackService.error(isEdit ? 'Não foi possível salvar o produto' : 'Não foi possível cadastrar o produto', error.message),
   });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: CreateProductData }) => 
-      ProductService.update(id, data),
-    onSuccess: () => {
-      FeedbackService.success('Produto atualizado com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['product', id] });
-      queryClient.invalidateQueries({ queryKey: ['category-counts'] });
-      queryClient.invalidateQueries({ queryKey: ['product-stats'] });
-      navigate('/painel/produtos');
-    },
-    onError: (error: Error) => {
-      FeedbackService.error('Erro ao atualizar produto', error.message);
-    }
-  });
+  const title = isEdit ? 'Editar produto' : 'Novo produto';
+  const header = (
+    <PageHeader
+      title={title}
+      description={isEdit ? product?.nome : 'Preencha os dados e publique no seu catálogo.'}
+      breadcrumbs={[{ label: 'Produtos', to: '/painel/produtos' }, { label: title }]}
+    />
+  );
 
-  const handleSubmit = async (data: CreateProductData) => {
-    if (isEdit && id) {
-      updateMutation.mutate({ id, data });
-    } else {
-      createMutation.mutate(data);
-    }
-  };
+  if (isEdit && isLoading) return <div>{header}<PageLoader label="Carregando produto…" /></div>;
 
-  const isSubmitting = createMutation.isPending || updateMutation.isPending;
-
-  // Loading state for edit mode
-  if (isEdit && isLoading) {
+  if (isEdit && !product) {
     return (
-      <RoleGuard requiredRole="EMPREENDEDOR">
-        <AppShell>
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-gray-600 dark:text-gray-400">Carregando produto...</p>
-            </div>
-          </div>
-        </AppShell>
-      </RoleGuard>
-    );
-  }
-
-  // Error state for edit mode when product not found
-  if (isEdit && !isLoading && !product) {
-    return (
-      <RoleGuard requiredRole="EMPREENDEDOR">
-        <AppShell>
-          <div className="p-6">
-            <div className="text-center py-12">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                Produto não encontrado
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                O produto que você está tentando editar não existe ou foi removido.
-              </p>
-              <Button 
-                onClick={() => navigate('/painel/produtos')} 
-                className="mr-3"
-              >
-                Voltar aos Produtos
-              </Button>
-              <Button 
-                onClick={() => navigate('/painel/produtos/novo')} 
-                variant="outline"
-              >
-                Criar Novo Produto
-              </Button>
-            </div>
-          </div>
-        </AppShell>
-      </RoleGuard>
+      <div>
+        {header}
+        <Card>
+          <EmptyState
+            title="Produto não encontrado"
+            description="Ele pode ter sido excluído."
+            action={<Button asChild><Link to="/painel/produtos">Voltar para produtos</Link></Button>}
+          />
+        </Card>
+      </div>
     );
   }
 
   return (
-    <RoleGuard requiredRole="EMPREENDEDOR">
-      <AppShell>
-        <div className="p-6 space-y-6">
-          <div className="flex items-center space-x-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/painel/produtos')}
-              aria-label="Voltar"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                {isEdit ? 'Editar Produto' : 'Novo Produto'}
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                {isEdit 
-                  ? 'Atualize as informações do produto' 
-                  : 'Adicione um novo produto ao seu catálogo'
-                }
-              </p>
-            </div>
-          </div>
-
-          <ProductForm
-            product={product || undefined}
-            onSubmit={handleSubmit}
-            loading={isSubmitting}
-          />
-        </div>
-      </AppShell>
-    </RoleGuard>
+    <div>
+      {header}
+      <ProductForm product={product ?? undefined} onSubmit={(data) => mutation.mutateAsync(data)} loading={mutation.isPending} />
+    </div>
   );
 }

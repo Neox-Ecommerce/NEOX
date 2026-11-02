@@ -23,8 +23,7 @@ import {
   Copy,
   Info
 } from 'lucide-react';
-import { AppShell } from '@/components/AppShell';
-import { RoleGuard } from '@/components/RoleGuard';
+import { PageLoader } from '@/components/PageStates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -137,7 +136,7 @@ function SecretInput({ id, value, onChange, placeholder }: {
   );
 }
 
-export function IntegracoesPage() {
+export function IntegracoesTab() {
   const [searchQuery, setSearchQuery] = useState('');
   const [gatewayModalOpen, setGatewayModalOpen] = useState(false);
   const [carrierModalOpen, setCarrierModalOpen] = useState(false);
@@ -413,41 +412,19 @@ export function IntegracoesPage() {
   const filteredWebhooks = webhooks.filter((w) => matches(w.name, w.url));
 
   if (gatewaysLoading || carriersLoading || integrationsLoading || webhooksLoading) {
-    return (
-      <RoleGuard requiredRole="EMPREENDEDOR">
-        <AppShell>
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </AppShell>
-      </RoleGuard>
-    );
+    return <PageLoader />;
   }
 
   const emptyState = (text: string) => (
     <Card className="lg:col-span-2">
-      <CardContent className="p-6 text-center text-gray-500">{text}</CardContent>
+      <CardContent className="p-6 text-center text-muted-foreground">{text}</CardContent>
     </Card>
   );
 
   return (
-    <RoleGuard requiredRole="EMPREENDEDOR">
-      <AppShell>
-        <div className="p-6 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Integrações
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Gerencie gateways de pagamento, transportadoras e outras integrações
-              </p>
-            </div>
-          </div>
-
+    <div className="space-y-6">
           <Tabs defaultValue="gateways" className="space-y-6">
-            <TabsList>
+            <TabsList className="h-auto flex-wrap">
               <TabsTrigger value="gateways" className="flex items-center gap-2">
                 <CreditCard className="h-4 w-4" />
                 Gateways
@@ -467,7 +444,7 @@ export function IntegracoesPage() {
             </TabsList>
 
             <TabsContent value="gateways" className="space-y-6">
-              <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 p-4 text-sm text-blue-800 dark:text-blue-200">
+              <div className="flex items-start gap-3 rounded-lg border border-info/30 bg-info-muted p-4 text-sm text-info">
                 <Info className="h-5 w-5 shrink-0 mt-0.5" />
                 <p>
                   Os pagamentos dos pedidos na NEOX são processados pelo Mercado Pago da plataforma. Os gateways abaixo
@@ -477,7 +454,7 @@ export function IntegracoesPage() {
 
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     placeholder="Buscar gateways..."
                     value={searchQuery}
@@ -511,25 +488,25 @@ export function IntegracoesPage() {
                       <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-1">
-                            <p className="text-sm text-gray-500">Taxa Cartão de Crédito</p>
+                            <p className="text-sm text-muted-foreground">Taxa Cartão de Crédito</p>
                             <p className="font-medium">{gateway.fees.creditCard}%</p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-sm text-gray-500">Taxa Cartão de Débito</p>
+                            <p className="text-sm text-muted-foreground">Taxa Cartão de Débito</p>
                             <p className="font-medium">{gateway.fees.debitCard}%</p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-sm text-gray-500">Taxa PIX</p>
+                            <p className="text-sm text-muted-foreground">Taxa PIX</p>
                             <p className="font-medium">{gateway.fees.pix}%</p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-sm text-gray-500">Taxa Boleto</p>
+                            <p className="text-sm text-muted-foreground">Taxa Boleto</p>
                             <p className="font-medium">{gateway.fees.boleto}%</p>
                           </div>
                         </div>
 
                         <div className="pt-4 border-t flex justify-between items-center">
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-muted-foreground">
                             Ambiente: <span className="font-medium">{gateway.config.environment === 'production' ? 'Produção' : 'Sandbox'}</span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -570,7 +547,7 @@ export function IntegracoesPage() {
             <TabsContent value="carriers" className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     placeholder="Buscar transportadoras..."
                     value={searchQuery}
@@ -603,9 +580,9 @@ export function IntegracoesPage() {
                     <CardContent>
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <p className="text-sm text-gray-500">Serviços</p>
+                          <p className="text-sm text-muted-foreground">Serviços</p>
                           <div className="flex flex-wrap gap-2">
-                            {carrier.config.services.length === 0 && <span className="text-sm text-gray-400">Nenhum</span>}
+                            {carrier.config.services.length === 0 && <span className="text-sm text-muted-foreground">Nenhum</span>}
                             {carrier.config.services.map((service, index) => (
                               <Badge key={index} variant="outline">
                                 {service}
@@ -615,7 +592,7 @@ export function IntegracoesPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <p className="text-sm text-gray-500">Cobertura</p>
+                          <p className="text-sm text-muted-foreground">Cobertura</p>
                           <div className="flex flex-wrap gap-2">
                             {carrier.coverage.regions.map((region, index) => (
                               <Badge key={index} variant="secondary">
@@ -627,11 +604,11 @@ export function IntegracoesPage() {
 
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-1">
-                            <p className="text-sm text-gray-500">Peso Máximo</p>
+                            <p className="text-sm text-muted-foreground">Peso Máximo</p>
                             <p className="font-medium">{carrier.coverage.maxWeight} kg</p>
                           </div>
                           <div className="space-y-1">
-                            <p className="text-sm text-gray-500">Dimensões Máximas</p>
+                            <p className="text-sm text-muted-foreground">Dimensões Máximas</p>
                             <p className="font-medium">
                               {carrier.coverage.maxDimensions.length} x {carrier.coverage.maxDimensions.width} x {carrier.coverage.maxDimensions.height} cm
                             </p>
@@ -639,7 +616,7 @@ export function IntegracoesPage() {
                         </div>
 
                         <div className="pt-4 border-t flex justify-between items-center">
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-muted-foreground">
                             Código: <span className="font-medium">{carrier.code}</span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -679,7 +656,7 @@ export function IntegracoesPage() {
 
             <TabsContent value="integrations" className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 className="text-lg font-semibold text-foreground">
                   Integrações Disponíveis
                 </h3>
               </div>
@@ -718,12 +695,12 @@ export function IntegracoesPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-muted-foreground">
                             {configured ? 'Credenciais configuradas' : 'Ainda não configurado'}
                           </div>
 
                           {integration.lastSync && (
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm text-muted-foreground">
                               Última sincronização: <span className="font-medium">
                                 {integration.lastSync.toLocaleString('pt-BR')}
                               </span>
@@ -756,7 +733,7 @@ export function IntegracoesPage() {
             <TabsContent value="webhooks" className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     placeholder="Buscar webhooks..."
                     value={searchQuery}
@@ -788,7 +765,7 @@ export function IntegracoesPage() {
                     <TableBody>
                       {filteredWebhooks.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                             Nenhum webhook cadastrado.
                           </TableCell>
                         </TableRow>
@@ -802,7 +779,7 @@ export function IntegracoesPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs font-mono truncate max-w-[200px]">
+                                <code className="bg-muted px-2 py-1 rounded text-xs font-mono truncate max-w-[200px]">
                                   {webhook.url}
                                 </code>
                                 <Button
@@ -844,11 +821,11 @@ export function IntegracoesPage() {
                             <TableCell>
                               <div className="space-y-1 text-sm">
                                 <div className="flex items-center gap-1">
-                                  <Check className="h-3 w-3 text-green-600" />
+                                  <Check className="h-3 w-3 text-success" />
                                   <span>{webhook.successCount} sucessos</span>
                                 </div>
                                 <div className="flex items-center gap-1">
-                                  <X className="h-3 w-3 text-red-600" />
+                                  <X className="h-3 w-3 text-destructive" />
                                   <span>{webhook.errorCount} erros</span>
                                 </div>
                               </div>
@@ -859,7 +836,7 @@ export function IntegracoesPage() {
                                   {webhook.lastTriggered.toLocaleString('pt-BR')}
                                 </div>
                               ) : (
-                                <span className="text-sm text-gray-500">Nunca executado</span>
+                                <span className="text-sm text-muted-foreground">Nunca executado</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right">
@@ -895,7 +872,7 @@ export function IntegracoesPage() {
                   </Table>
                 </CardContent>
               </Card>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 O teste envia um POST com o evento <code>webhook.test</code>. Quando há secret, o corpo é assinado no
                 cabeçalho <code>X-Neox-Signature: sha256=&lt;HMAC-SHA256 do corpo&gt;</code>.
               </p>
@@ -928,7 +905,7 @@ export function IntegracoesPage() {
                         <SelectItem key={gateway.id} value={gateway.id}>
                           <div>
                             <div className="font-medium">{gateway.name}</div>
-                            <div className="text-xs text-gray-500">{gateway.description}</div>
+                            <div className="text-xs text-muted-foreground">{gateway.description}</div>
                           </div>
                         </SelectItem>
                       ))}
@@ -966,7 +943,7 @@ export function IntegracoesPage() {
                       <SecretInput id="secret-key" value={gatewayForm.secretKey} placeholder="Chave secreta"
                         onChange={(v) => setGatewayForm((prev) => ({ ...prev, secretKey: v }))} />
                       {gatewayForm.editingId && (
-                        <p className="text-xs text-gray-500">Deixe como está para manter a chave atual.</p>
+                        <p className="text-xs text-muted-foreground">Deixe como está para manter a chave atual.</p>
                       )}
                     </div>
 
@@ -1002,7 +979,7 @@ export function IntegracoesPage() {
                           ['boleto', 'Boleto'],
                         ] as const).map(([key, label]) => (
                           <div key={key} className="space-y-1">
-                            <Label htmlFor={`fee-${key}`} className="text-xs text-gray-500">{label}</Label>
+                            <Label htmlFor={`fee-${key}`} className="text-xs text-muted-foreground">{label}</Label>
                             <Input id={`fee-${key}`} type="number" min="0" max="100" step="0.01"
                               value={gatewayForm.fees[key]}
                               onChange={(e) => setGatewayForm((prev) => ({ ...prev, fees: { ...prev.fees, [key]: num(e.target.value) } }))} />
@@ -1051,7 +1028,7 @@ export function IntegracoesPage() {
                         <SelectItem key={carrier.id} value={carrier.id}>
                           <div>
                             <div className="font-medium">{carrier.name}</div>
-                            <div className="text-xs text-gray-500">{carrier.description}</div>
+                            <div className="text-xs text-muted-foreground">{carrier.description}</div>
                           </div>
                         </SelectItem>
                       ))}
@@ -1089,7 +1066,7 @@ export function IntegracoesPage() {
                                   id={`svc-${service}`}
                                   checked={carrierForm.services.includes(service)}
                                   onChange={(e) => setCarrierForm((prev) => ({ ...prev, services: toggleIn(prev.services, service, e.target.checked) }))}
-                                  className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                                  className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
                                 />
                                 <Label htmlFor={`svc-${service}`} className="text-sm">{service}</Label>
                               </div>
@@ -1127,7 +1104,7 @@ export function IntegracoesPage() {
                               id={`region-${region}`}
                               checked={carrierForm.regions.includes(region)}
                               onChange={(e) => setCarrierForm((prev) => ({ ...prev, regions: toggleIn(prev.regions, region, e.target.checked) }))}
-                              className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                              className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
                             />
                             <Label htmlFor={`region-${region}`} className="text-sm">{region}</Label>
                           </div>
@@ -1143,7 +1120,7 @@ export function IntegracoesPage() {
                         ['height', 'Altura (cm)'],
                       ] as const).map(([key, label]) => (
                         <div key={key} className="space-y-1">
-                          <Label htmlFor={`dim-${key}`} className="text-xs text-gray-500">{label}</Label>
+                          <Label htmlFor={`dim-${key}`} className="text-xs text-muted-foreground">{label}</Label>
                           <Input id={`dim-${key}`} type="number" min="0" step="0.1" value={carrierForm[key]}
                             onChange={(e) => setCarrierForm((prev) => ({ ...prev, [key]: num(e.target.value) }))} />
                         </div>
@@ -1247,7 +1224,7 @@ export function IntegracoesPage() {
                   </div>
                   <SecretInput id="webhook-secret" value={webhookData.secret} placeholder="Chave secreta para validar webhooks"
                     onChange={(v) => setWebhookData(prev => ({ ...prev, secret: v }))} />
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-muted-foreground">
                     A secret key assina os eventos enviados (HMAC-SHA256). Ela não é exibida novamente depois de salva.
                   </p>
                 </div>
@@ -1262,7 +1239,7 @@ export function IntegracoesPage() {
                           id={event.value}
                           checked={webhookData.events.includes(event.value)}
                           onChange={(e) => setWebhookData(prev => ({ ...prev, events: toggleIn(prev.events, event.value, e.target.checked) }))}
-                          className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                          className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
                         />
                         <Label htmlFor={event.value} className="text-sm">
                           {event.label}
@@ -1278,7 +1255,7 @@ export function IntegracoesPage() {
                     id="is-active"
                     checked={webhookData.isActive}
                     onChange={(e) => setWebhookData(prev => ({ ...prev, isActive: e.target.checked }))}
-                    className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
                   />
                   <Label htmlFor="is-active" className="text-sm">
                     Webhook ativo
@@ -1300,7 +1277,5 @@ export function IntegracoesPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </AppShell>
-    </RoleGuard>
   );
 }

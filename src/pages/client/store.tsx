@@ -1,30 +1,43 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Package, MapPin, Clock, Phone, Globe, Instagram, Truck, Search, ArrowLeft } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, BadgeCheck, Clock, Globe, Instagram, MapPin, PackageSearch, Phone, Search, Store, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { CatalogService } from '@/services/CatalogService';
+import { EmptyState, ErrorState, PageLoader, QueryState } from '@/components/PageStates';
+import { ApiError } from '@/lib/api';
+import { formatCurrency } from '@/lib/utils';
+import { useDebounce } from '@/hooks/useDebounce';
 import { AnalyticsService } from '@/services/AnalyticsService';
+import { CatalogService, type PublicStore } from '@/services/CatalogService';
 import { StoreService } from '@/services/StoreService';
-import { ProductCard } from './ProductCard';
+import { ProductCard, ProductGrid } from './ProductCard';
 import { useAddToCart } from './useAddToCart';
+
+const httpsUrl = (url: string) => (/^https?:\/\//i.test(url) ? url : `https://${url}`);
+const instagramUrl = (handle: string) =>
+  /^https?:\/\//i.test(handle) ? handle : `https://instagram.com/${handle.replace(/^@/, '')}`;
+
+function deliveryText(store: PublicStore): string | null {
+  const parts: string[] = [];
+  if (store.defaultShippingCost != null) {
+    parts.push(store.defaultShippingCost > 0 ? `Frete ${formatCurrency(store.defaultShippingCost)}` : 'Frete grátis');
+  }
+  if (store.freeShippingThreshold) parts.push(`grátis acima de ${formatCurrency(store.freeShippingThreshold)}`);
+  return parts.length ? parts.join(', ') : null;
+}
 
 export function StorePage() {
   const { id = '' } = useParams();
   const [search, setSearch] = useState('');
-  const { add, isPending } = useAddToCart();
+  const term = useDebounce(search.trim(), 350);
+  const { add, isAdding } = useAddToCart();
 
-  const { data: store, isLoading, isError } = useQuery({
-    queryKey: ['catalog-store', id],
-    queryFn: () => CatalogService.getStore(id),
-    enabled: !!id,
-  });
-  const { data: products = [] } = useQuery({
-    queryKey: ['catalog-store-products', id],
-    queryFn: () => CatalogService.getStoreProducts(id),
+  const storeQuery = useQuery({ queryKey: ['catalog-store', id], queryFn: () => CatalogService.getStore(id), enabled: !!id });
+  const store = storeQuery.data;
+  const products = useQuery({
+    queryKey: ['catalog-store-products', id, term],
+    queryFn: () => CatalogService.getStoreProducts(id, { q: term || undefined }),
     enabled: !!store,
   });
 
@@ -32,118 +45,139 @@ export function StorePage() {
     if (store) AnalyticsService.track('store_view', store.id);
   }, [store]);
 
-  if (isLoading) {
+  if (storeQuery.isLoading) return <PageLoader />;
+  if (storeQuery.error instanceof ApiError && storeQuery.error.status === 404) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <EmptyState
+        icon={Store}
+        title="Loja não encontrada"
+        description="Ela pode estar fora do ar no momento."
+        action={<Button asChild><Link to="/lojas">Ver todas as lojas</Link></Button>}
+        className="py-24"
+      />
     );
   }
+  if (storeQuery.error || !store) return <ErrorState error={storeQuery.error} onRetry={() => storeQuery.refetch()} />;
 
-  if (isError || !store) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
-        <Package className="h-12 w-12 text-gray-400" />
-        <p className="text-gray-600">Loja não encontrada.</p>
-        <Link to="/"><Button>Voltar</Button></Link>
-      </div>
-    );
-  }
-
-  const term = search.trim().toLowerCase();
-  const visible = term ? products.filter((p) => p.nome.toLowerCase().includes(term)) : products;
   const hours = StoreService.getDiasSemana().filter((d) => store.horarioFuncionamento?.[d.key]?.ativo);
   const social = store.redesSociais ?? {};
+  const delivery = deliveryText(store);
+  const link = 'inline-flex min-h-11 items-center gap-3 text-primary hover:underline sm:min-h-0';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Link to="/cliente" className="inline-flex items-center text-sm text-gray-600 mb-4">
-            <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
-          </Link>
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            <div className="h-24 w-24 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden">
-              {store.logo ? (
-                <img src={store.logo} alt={store.nomeFantasia} className="h-full w-full object-cover" />
-              ) : (
-                <Package className="h-12 w-12 text-gray-400" />
-              )}
-            </div>
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900">{store.nomeFantasia}</h1>
-              {store.descricaoLoja && <p className="text-gray-600 mt-2">{store.descricaoLoja}</p>}
-              <div className="flex items-center gap-2 mt-4">
-                <Badge variant="outline">{store.segmento}</Badge>
-                {store.cnpjVerificado && <Badge variant="success">Verificada</Badge>}
-              </div>
-            </div>
-          </div>
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <Link to="/lojas" className="mb-4 inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Todas as lojas
+      </Link>
+
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
+          {store.logo ? (
+            <img src={store.logo} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <Store className="h-10 w-10 text-muted-foreground" aria-hidden="true" />
+          )}
         </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Informações da Loja</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                {store.endereco && (
-                  <div className="flex items-center gap-3"><MapPin className="h-4 w-4 text-gray-400" />{store.endereco}</div>
-                )}
-                {store.telefone && (
-                  <div className="flex items-center gap-3"><Phone className="h-4 w-4 text-gray-400" />{store.telefone}</div>
-                )}
-                {social.website && (
-                  <div className="flex items-center gap-3"><Globe className="h-4 w-4 text-gray-400" />{social.website}</div>
-                )}
-                {social.instagram && (
-                  <div className="flex items-center gap-3"><Instagram className="h-4 w-4 text-gray-400" />@{social.instagram}</div>
-                )}
-                {store.tiposEntrega?.length > 0 && (
-                  <div className="flex items-center gap-3"><Truck className="h-4 w-4 text-gray-400" />{store.tiposEntrega.join(', ')}</div>
-                )}
-                {hours.length > 0 && (
-                  <div className="flex gap-3">
-                    <Clock className="h-4 w-4 text-gray-400 mt-0.5" />
-                    <div className="space-y-1">
-                      {hours.map((d) => (
-                        <div key={d.key}>
-                          {d.label}: {store.horarioFuncionamento[d.key].abertura}–{store.horarioFuncionamento[d.key].fechamento}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="lg:col-span-3">
-            <div className="flex items-center justify-between gap-4 mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Produtos ({products.length})</h2>
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input className="pl-9" placeholder="Buscar nesta loja" value={search} onChange={(e) => setSearch(e.target.value)} />
-              </div>
-            </div>
-
-            {visible.length === 0 ? (
-              <div className="text-center py-12">
-                <Package className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-4 text-lg font-medium text-gray-900">Nenhum produto encontrado</h3>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                {visible.map((p) => (
-                  <ProductCard key={p.id} product={p} onAdd={(prod) => add(prod)} adding={isPending} />
-                ))}
-              </div>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-semibold tracking-tight">{store.nomeFantasia}</h1>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <span>{store.segmento}</span>
+            {store.cnpjVerificado && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-success/20 bg-success-muted px-2 py-0.5 text-xs font-medium text-success">
+                <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" /> Loja verificada
+              </span>
             )}
-          </div>
+          </p>
+          {store.descricaoLoja && <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{store.descricaoLoja}</p>}
         </div>
+      </header>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-4">
+        <aside className="rounded-lg border bg-card p-4 text-sm lg:col-span-1 lg:self-start">
+          <h2 className="mb-3 font-semibold">Informações</h2>
+          <ul className="space-y-2">
+            {delivery && (
+              <li className="flex gap-3"><Truck className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />{delivery}</li>
+            )}
+            {store.tiposEntrega?.length > 0 && (
+              <li className="flex gap-3"><Truck className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />{store.tiposEntrega.join(', ')}</li>
+            )}
+            {store.endereco && (
+              <li className="flex gap-3"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />{store.endereco}</li>
+            )}
+            {store.telefone && (
+              <li>
+                <a href={`tel:${store.telefone.replace(/[^\d+]/g, '')}`} className={link}>
+                  <Phone className="h-4 w-4 shrink-0" aria-hidden="true" />{store.telefone}
+                </a>
+              </li>
+            )}
+            {social.website && (
+              <li>
+                <a href={httpsUrl(social.website)} target="_blank" rel="noopener noreferrer" className={`${link} break-all`}>
+                  <Globe className="h-4 w-4 shrink-0" aria-hidden="true" />{social.website}
+                </a>
+              </li>
+            )}
+            {social.instagram && (
+              <li>
+                <a href={instagramUrl(social.instagram)} target="_blank" rel="noopener noreferrer" className={link}>
+                  <Instagram className="h-4 w-4 shrink-0" aria-hidden="true" />@{social.instagram.replace(/^@/, '')}
+                </a>
+              </li>
+            )}
+            {hours.length > 0 && (
+              <li className="flex gap-3">
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="space-y-0.5">
+                  {hours.map((d) => (
+                    <span key={d.key} className="block">
+                      {d.label}: {store.horarioFuncionamento[d.key].abertura}–{store.horarioFuncionamento[d.key].fechamento}
+                    </span>
+                  ))}
+                </span>
+              </li>
+            )}
+          </ul>
+        </aside>
+
+        <section className="lg:col-span-3" aria-labelledby="produtos-loja">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 id="produtos-loja" className="text-lg font-semibold">
+              Produtos{products.data ? ` (${products.data.length})` : ''}
+            </h2>
+            <div className="relative w-full sm:w-64">
+              <label htmlFor="busca-loja" className="sr-only">Buscar nesta loja</label>
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input id="busca-loja" type="search" className="pl-9" placeholder="Buscar nesta loja" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          </div>
+          <QueryState
+            query={products}
+            isEmpty={(d) => d.length === 0}
+            empty={
+              <EmptyState
+                icon={PackageSearch}
+                title={term ? 'Nenhum produto encontrado' : 'Esta loja ainda não tem produtos'}
+                action={
+                  term ? (
+                    <Button variant="outline" onClick={() => setSearch('')}>Limpar busca</Button>
+                  ) : (
+                    <Button asChild variant="outline"><Link to="/lojas">Ver outras lojas</Link></Button>
+                  )
+                }
+              />
+            }
+          >
+            {(items) => (
+              <ProductGrid>
+                {items.map((p) => (
+                  <ProductCard key={p.id} product={p} onAdd={(prod) => add(prod)} adding={isAdding(p.id)} />
+                ))}
+              </ProductGrid>
+            )}
+          </QueryState>
+        </section>
       </div>
     </div>
   );

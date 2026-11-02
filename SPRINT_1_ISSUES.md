@@ -7,7 +7,7 @@
 
 ---
 
-## 🎯 assegnado a: Alan Nicolas
+## assegnado a: Alan Nicolas
 
 ### 1. [FRONT-END] Refatorar AuthService.ts para usar a API
 * **Resumo:** Substituir a lógica de login/registo com `localStorage` por chamadas reais à API.
@@ -26,7 +26,7 @@
 
 ---
 
-## 🎯 assegnado a: Fabricio Sousa
+## assegnado a: Fabricio Sousa
 
 ### 1. [FRONT-END] Conectar o Formulário de Produtos (ProductForm.tsx)
 * **Resumo:** Fazer com que o formulário de criação/edição de produtos envie os dados e a imagem para a API.

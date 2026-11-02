@@ -70,6 +70,15 @@ export const AuthService = {
     return api<User>('/auth/me', { method: 'PUT', body: data });
   },
 
+  /** A API responde sempre sem erro de "e-mail não encontrado" (não revela quem tem conta). */
+  async forgotPassword(email: string): Promise<void> {
+    await api('/auth/forgot-password', { method: 'POST', body: { email } });
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await api('/auth/reset-password', { method: 'POST', body: { token, newPassword } });
+  },
+
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     await api('/auth/change-password', { method: 'POST', body: { currentPassword, newPassword } });
   },

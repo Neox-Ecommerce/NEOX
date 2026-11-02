@@ -29,6 +29,8 @@ export interface Payout {
   };
   scheduledDate: Date;
   processedDate?: Date;
+  /** Observação do admin (ex.: motivo da falha). */
+  note?: string | null;
   createdAt: Date;
 }
 
@@ -39,6 +41,10 @@ export interface FinancialStats {
   pendingAmount: number;
   availableForPayout: number;
   totalPayouts: number;
+  /** Taxa da plataforma (%) definida pelo admin; já descontada de availableForPayout. */
+  platformFeePercent?: number;
+  /** Valor da taxa da plataforma sobre o bruto aprovado. */
+  platformFees?: number;
   averageTicket: number;
   transactionCount: number;
 }

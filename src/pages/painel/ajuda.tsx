@@ -14,9 +14,8 @@ import {
   CheckCircle,
   Clock,
 } from 'lucide-react';
-import { AppShell } from '@/components/AppShell';
-import { RoleGuard } from '@/components/RoleGuard';
 import { Button } from '@/components/ui/button';
+import { ErrorState, PageLoader, PageHeader } from '@/components/PageStates';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -61,18 +60,18 @@ export function AjudaPage() {
 
   const queryClient = useQueryClient();
 
-  const { data: faq = [], isLoading: faqLoading } = useQuery({
+  const { data: faq = [], isLoading: faqLoading, error: loadError0, refetch: reload0 } = useQuery({
     queryKey: ['faq', selectedFAQCategory],
     queryFn: () => HelpService.getFAQ(selectedFAQCategory || undefined)
   });
 
-  const { data: tickets = [], isLoading: ticketsLoading } = useQuery({
+  const { data: tickets = [], isLoading: ticketsLoading, error: loadError1, refetch: reload1 } = useQuery({
     queryKey: ['support-tickets', user?.id],
     queryFn: HelpService.getSupportTickets
   });
   const selectedTicket = tickets.find((t) => t.id === selectedTicketId) ?? null;
 
-  const { data: tutorials = [], isLoading: tutorialsLoading } = useQuery({
+  const { data: tutorials = [], isLoading: tutorialsLoading, error: loadError2, refetch: reload2 } = useQuery({
     queryKey: ['tutorials', selectedTutorialCategory],
     queryFn: () => HelpService.getTutorials(selectedTutorialCategory || undefined)
   });
@@ -222,43 +221,28 @@ export function AjudaPage() {
   };
 
   if (faqLoading || ticketsLoading || tutorialsLoading) {
-    return (
-      <RoleGuard requiredRole="EMPREENDEDOR">
-        <AppShell>
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </AppShell>
-      </RoleGuard>
-    );
+    return <PageLoader />;
   }
 
+  const loadError = loadError0 || loadError1 || loadError2;
+  if (loadError) return <ErrorState error={loadError} onRetry={() => { reload0(); reload1(); reload2(); }} />;
+
   return (
-    <RoleGuard requiredRole="EMPREENDEDOR">
-      <AppShell>
-        <div className="p-6 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Central de Ajuda
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Encontre respostas para suas dúvidas e obtenha suporte
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-3">
+    <div className="space-y-6">
+          <PageHeader
+            title="Central de Ajuda"
+            description="Encontre respostas para suas dúvidas e obtenha suporte"
+            actions={<>
               <Button onClick={() => setTicketModalOpen(true)}>
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Abrir Ticket
               </Button>
-            </div>
-          </div>
+            </>}
+          />
 
           {/* Search */}
           <div className="relative max-w-2xl mx-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
             <Input
               placeholder="Buscar na Central de Ajuda..."
               value={searchQuery}
@@ -326,11 +310,11 @@ export function AjudaPage() {
                   {filteredFAQ.length === 0 ? (
                     <Card>
                       <CardContent className="p-6 text-center">
-                        <HelpCircle className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                        <HelpCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-medium text-foreground mb-2">
                           Nenhuma pergunta encontrada
                         </h3>
-                        <p className="text-gray-600 dark:text-gray-400">
+                        <p className="text-muted-foreground">
                           {searchQuery 
                             ? `Não encontramos resultados para "${searchQuery}"`
                             : 'Não há perguntas disponíveis nesta categoria'
@@ -342,9 +326,9 @@ export function AjudaPage() {
                     <Accordion type="single" collapsible className="space-y-4">
                       {filteredFAQ.map((item) => (
                         <AccordionItem key={item.id} value={item.id} className="border rounded-lg overflow-hidden">
-                          <AccordionTrigger className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <AccordionTrigger className="px-6 py-4 hover:bg-muted">
                             <div className="text-left">
-                              <div className="font-medium text-gray-900 dark:text-white">
+                              <div className="font-medium text-foreground">
                                 {item.question}
                               </div>
                               <div className="flex items-center gap-2 mt-1">
@@ -359,14 +343,14 @@ export function AjudaPage() {
                               </div>
                             </div>
                           </AccordionTrigger>
-                          <AccordionContent className="px-6 py-4 bg-gray-50 dark:bg-gray-800">
+                          <AccordionContent className="px-6 py-4 bg-muted">
                             <div className="space-y-4">
                               <div className="prose prose-sm max-w-none dark:prose-invert">
                                 <p>{item.answer}</p>
                               </div>
                               
                               <div className="flex items-center justify-between pt-4 border-t">
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-muted-foreground">
                                   Esta resposta foi útil?
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -410,11 +394,11 @@ export function AjudaPage() {
               {tickets.length === 0 ? (
                 <Card>
                   <CardContent className="p-6 text-center">
-                    <MessageSquare className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                    <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">
                       Nenhum ticket encontrado
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    <p className="text-muted-foreground mb-4">
                       Você ainda não abriu nenhum ticket de suporte
                     </p>
                     <Button onClick={() => setTicketModalOpen(true)}>
@@ -431,16 +415,16 @@ export function AjudaPage() {
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div className="space-y-2">
                             <div className="flex items-center gap-2">
-                              <h3 className="font-medium text-gray-900 dark:text-white">
+                              <h3 className="font-medium text-foreground">
                                 {ticket.subject}
                               </h3>
                               {getStatusBadge(ticket.status)}
                               {getPriorityBadge(ticket.priority)}
                             </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                            <p className="text-sm text-muted-foreground line-clamp-2">
                               {ticket.description}
                             </p>
-                            <div className="flex items-center gap-4 text-sm text-gray-500">
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <div className="flex items-center gap-1">
                                 <Clock className="h-4 w-4" />
                                 {new Date(ticket.createdAt).toLocaleDateString('pt-BR')}
@@ -492,14 +476,14 @@ export function AjudaPage() {
                             <div 
                               className={`max-w-[80%] rounded-lg p-4 ${
                                 message.isFromSupport 
-                                  ? 'bg-gray-100 dark:bg-gray-800' 
+                                  ? 'bg-muted' 
                                   : 'bg-primary/10 dark:bg-primary/20'
                               }`}
                             >
                               <div className="flex items-center gap-2 mb-2">
                                 <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
                                   message.isFromSupport 
-                                    ? 'bg-blue-100 text-blue-600' 
+                                    ? 'bg-info-muted text-info' 
                                     : 'bg-primary/20 text-primary'
                                 }`}>
                                   {message.isFromSupport ? 'S' : user?.name?.charAt(0).toUpperCase() || 'U'}
@@ -508,7 +492,7 @@ export function AjudaPage() {
                                   <div className="font-medium">
                                     {message.isFromSupport ? 'Suporte NEOX' : user?.name || 'Você'}
                                   </div>
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs text-muted-foreground">
                                     {new Date(message.createdAt).toLocaleString('pt-BR')}
                                   </div>
                                 </div>
@@ -555,9 +539,9 @@ export function AjudaPage() {
 
                       {/* Ticket Closed Message */}
                       {(selectedTicket.status === 'closed' || selectedTicket.status === 'resolved') && (
-                        <div className="bg-gray-50 dark:bg-gray-800 border rounded-lg p-4 text-center">
-                          <CheckCircle className="mx-auto h-8 w-8 text-green-600 mb-2" />
-                          <p className="text-gray-600 dark:text-gray-400">
+                        <div className="bg-muted border rounded-lg p-4 text-center">
+                          <CheckCircle className="mx-auto h-8 w-8 text-success mb-2" />
+                          <p className="text-muted-foreground">
                             Este ticket está {selectedTicket.status === 'closed' ? 'fechado' : 'resolvido'}.
                           </p>
                           <Button 
@@ -615,11 +599,11 @@ export function AjudaPage() {
                   {filteredTutorials.length === 0 ? (
                     <Card>
                       <CardContent className="p-6 text-center">
-                        <Video className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                        <Video className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <h3 className="text-lg font-medium text-foreground mb-2">
                           Nenhum tutorial encontrado
                         </h3>
-                        <p className="text-gray-600 dark:text-gray-400">
+                        <p className="text-muted-foreground">
                           {searchQuery 
                             ? `Não encontramos resultados para "${searchQuery}"`
                             : 'Não há tutoriais disponíveis nesta categoria'
@@ -639,8 +623,8 @@ export function AjudaPage() {
                                 className="w-full h-40 object-cover rounded-t-lg"
                               />
                             ) : (
-                              <div className="w-full h-40 bg-gray-100 dark:bg-gray-800 rounded-t-lg flex items-center justify-center">
-                                <Video className="h-12 w-12 text-gray-400" />
+                              <div className="w-full h-40 bg-muted rounded-t-lg flex items-center justify-center">
+                                <Video className="h-12 w-12 text-muted-foreground" />
                               </div>
                             )}
                             <Badge className="absolute top-2 right-2" variant={
@@ -653,19 +637,19 @@ export function AjudaPage() {
                           </div>
                           
                           <CardContent className="p-4">
-                            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
+                            <h3 className="font-semibold text-foreground mb-2">
                               {tutorial.title}
                             </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                            <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                               {tutorial.description}
                             </p>
                             
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-sm text-gray-500">
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Clock className="h-4 w-4" />
                                 {tutorial.estimatedTime} min
                               </div>
-                              <div className="flex items-center gap-2 text-sm text-gray-500">
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <ThumbsUp className="h-4 w-4" />
                                 {tutorial.likes}
                               </div>
@@ -699,8 +683,8 @@ export function AjudaPage() {
                           <Mail className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">Email</h3>
-                          <p className="text-gray-600 dark:text-gray-400">
+                          <h3 className="font-medium text-foreground">Email</h3>
+                          <p className="text-muted-foreground">
                             {contactInfo.email}
                           </p>
                           <Button variant="link" className="p-0 h-auto text-primary" asChild>
@@ -714,8 +698,8 @@ export function AjudaPage() {
                           <MessageSquare className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">Tickets de suporte</h3>
-                          <p className="text-gray-600 dark:text-gray-400">
+                          <h3 className="font-medium text-foreground">Tickets de suporte</h3>
+                          <p className="text-muted-foreground">
                             Acompanhe o atendimento pela aba Meus Tickets
                           </p>
                           <Button variant="link" className="p-0 h-auto text-primary" onClick={() => setTicketModalOpen(true)}>
@@ -726,7 +710,7 @@ export function AjudaPage() {
                     </div>
 
                     <div className="border-t pt-4">
-                      <h3 className="font-medium text-gray-900 dark:text-white mb-2">Horário de Atendimento</h3>
+                      <h3 className="font-medium text-foreground mb-2">Horário de Atendimento</h3>
                       <div className="space-y-1 text-sm">
                         {contactInfo.businessHours.map((h) => (
                           <div key={h.days} className="flex justify-between">
@@ -813,12 +797,12 @@ export function AjudaPage() {
               <ol className="space-y-4">
                 {openTutorial?.steps.map((step, index) => (
                   <li key={index} className="flex gap-3">
-                    <div className="h-7 w-7 shrink-0 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                    <div className="h-7 w-7 shrink-0 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
                       {index + 1}
                     </div>
                     <div className="space-y-2">
-                      <h4 className="font-medium text-gray-900 dark:text-white">{step.title}</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{step.content}</p>
+                      <h4 className="font-medium text-foreground">{step.title}</h4>
+                      <p className="text-sm text-muted-foreground">{step.content}</p>
                       {step.image && <img src={step.image} alt={step.title} className="rounded-lg max-h-60" />}
                       {step.video && <video src={step.video} controls className="rounded-lg max-h-60 w-full" />}
                     </div>
@@ -897,14 +881,14 @@ export function AjudaPage() {
                   />
                 </div>
 
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="bg-warning-muted border border-warning/30 rounded-lg p-4">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 text-warning mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-yellow-800">
+                      <p className="text-sm font-medium text-warning">
                         Dicas para um atendimento mais rápido
                       </p>
-                      <ul className="text-sm text-yellow-700 mt-1 space-y-1 list-disc list-inside">
+                      <ul className="text-sm text-warning mt-1 space-y-1 list-disc list-inside">
                         <li>Seja claro e detalhado na descrição do problema</li>
                         <li>Informe quais passos você já tentou para resolver</li>
                       </ul>
@@ -927,7 +911,5 @@ export function AjudaPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </AppShell>
-    </RoleGuard>
   );
 }

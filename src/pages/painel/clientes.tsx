@@ -6,7 +6,6 @@ import {
   Filter,
   Download,
   Eye,
-  Edit,
   Mail,
   Phone,
   MapPin,
@@ -18,9 +17,9 @@ import {
   Tag,
   MoreHorizontal
 } from 'lucide-react';
-import { AppShell } from '@/components/AppShell';
-import { RoleGuard } from '@/components/RoleGuard';
 import { Button } from '@/components/ui/button';
+import { MetricCard } from '@/components/MetricCard';
+import { ErrorState, IconButton, PageLoader, PageHeader } from '@/components/PageStates';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -61,12 +60,12 @@ export function ClientesPage() {
 
   const { user } = useAuth();
 
-  const { data: clients = [], isLoading } = useQuery({
+  const { data: clients = [], isLoading, error: loadError0, refetch: reload0 } = useQuery({
     queryKey: ['clients', user?.lojaId],
     queryFn: () => ClientsService.getClients()
   });
 
-  const { data: clientStats } = useQuery({
+  const { data: clientStats, error: loadError1, refetch: reload1 } = useQuery({
     queryKey: ['client-stats', user?.lojaId],
     queryFn: () => ClientsService.getClientStats()
   });
@@ -127,109 +126,42 @@ export function ClientesPage() {
   };
 
   const getClientSegment = (client: Client) => {
-    if (client.totalSpent > 10000) return { label: 'VIP', color: 'bg-purple-100 text-purple-800' };
-    if (client.totalSpent > 5000) return { label: 'Premium', color: 'bg-blue-100 text-blue-800' };
-    if (client.totalOrders > 5) return { label: 'Fidelizado', color: 'bg-green-100 text-green-800' };
-    if (client.totalOrders === 1) return { label: 'Novo', color: 'bg-yellow-100 text-yellow-800' };
-    return { label: 'Regular', color: 'bg-gray-100 text-gray-800' };
+    if (client.totalSpent > 10000) return { label: 'VIP', color: 'bg-info-muted text-info' };
+    if (client.totalSpent > 5000) return { label: 'Premium', color: 'bg-info-muted text-info' };
+    if (client.totalOrders > 5) return { label: 'Fidelizado', color: 'bg-success-muted text-success' };
+    if (client.totalOrders === 1) return { label: 'Novo', color: 'bg-warning-muted text-warning' };
+    return { label: 'Regular', color: 'bg-muted text-foreground' };
   };
 
   if (isLoading) {
-    return (
-      <RoleGuard requiredRole="EMPREENDEDOR">
-        <AppShell>
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </AppShell>
-      </RoleGuard>
-    );
+    return <PageLoader />;
   }
 
+  const loadError = loadError0 || loadError1;
+  if (loadError) return <ErrorState error={loadError} onRetry={() => { reload0(); reload1(); }} />;
+
   return (
-    <RoleGuard requiredRole="EMPREENDEDOR">
-      <AppShell>
-        <div className="p-6 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Clientes
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Gerencie sua base de clientes e relacionamento
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-3">
+    <div className="space-y-6">
+          <PageHeader
+            title="Clientes"
+            description="Gerencie sua base de clientes e relacionamento"
+            actions={<>
               <Button variant="outline" onClick={handleExportClients} disabled={exportClientsMutation.isPending}>
                 <Download className="h-4 w-4 mr-2" />
                 {exportClientsMutation.isPending ? 'Exportando...' : 'Exportar'}
               </Button>
-              <Button>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Novo Cliente
-              </Button>
-            </div>
-          </div>
+            </>}
+          />
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total de Clientes</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {clientStats?.totalClients || 0}
-                    </p>
-                  </div>
-                  <Users className="h-8 w-8 text-blue-600" />
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <MetricCard title="Total de Clientes" value={clientStats?.totalClients || 0} icon={Users} />
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Clientes Ativos</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {clientStats?.activeClients || 0}
-                    </p>
-                  </div>
-                  <Star className="h-8 w-8 text-green-600" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Clientes Ativos" value={clientStats?.activeClients || 0} icon={Star} />
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Novos (Este Mês)</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {clientStats?.newClientsThisMonth || 0}
-                    </p>
-                  </div>
-                  <UserPlus className="h-8 w-8 text-purple-600" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Novos (Este Mês)" value={clientStats?.newClientsThisMonth || 0} icon={UserPlus} />
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Ticket Médio</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(clientStats?.averageTicket || 0)}
-                    </p>
-                  </div>
-                  <DollarSign className="h-8 w-8 text-yellow-600" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Ticket Médio" value={formatCurrency(clientStats?.averageTicket || 0)} icon={DollarSign} />
           </div>
 
           <Tabs defaultValue="all-clients" className="space-y-6">
@@ -244,7 +176,7 @@ export function ClientesPage() {
               {/* Filters */}
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     placeholder="Buscar clientes..."
                     value={searchQuery}
@@ -296,10 +228,10 @@ export function ClientesPage() {
                                   </span>
                                 </div>
                                 <div>
-                                  <div className="font-medium text-gray-900 dark:text-white">
+                                  <div className="font-medium text-foreground">
                                     {client.name}
                                   </div>
-                                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  <div className="text-sm text-muted-foreground">
                                     {client.document}
                                   </div>
                                 </div>
@@ -308,22 +240,22 @@ export function ClientesPage() {
                             <TableCell>
                               <div className="space-y-1">
                                 <div className="flex items-center gap-1 text-sm">
-                                  <Mail className="h-3 w-3 text-gray-400" />
+                                  <Mail className="h-3 w-3 text-muted-foreground" />
                                   {client.email}
                                 </div>
-                                <div className="flex items-center gap-1 text-sm text-gray-500">
-                                  <Phone className="h-3 w-3 text-gray-400" />
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                  <Phone className="h-3 w-3 text-muted-foreground" />
                                   {client.phone}
                                 </div>
                               </div>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1">
-                                <ShoppingBag className="h-4 w-4 text-gray-400" />
+                                <ShoppingBag className="h-4 w-4 text-muted-foreground" />
                                 <span className="font-medium">{client.totalOrders}</span>
                               </div>
                             </TableCell>
-                            <TableCell className="font-semibold text-green-600">
+                            <TableCell className="font-semibold text-success">
                               {formatCurrency(client.totalSpent)}
                             </TableCell>
                             <TableCell>
@@ -340,22 +272,18 @@ export function ClientesPage() {
                             <TableCell className="text-right">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
+                                  <IconButton label={`Ações para ${client.name}`} icon={MoreHorizontal} />
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => handleViewClient(client)}>
                                     <Eye className="h-4 w-4 mr-2" />
                                     Ver Detalhes
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <Mail className="h-4 w-4 mr-2" />
-                                    Enviar Email
+                                  <DropdownMenuItem asChild>
+                                    <a href={`mailto:${client.email}`}>
+                                      <Mail className="h-4 w-4 mr-2" aria-hidden="true" />
+                                      Enviar e-mail
+                                    </a>
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -373,7 +301,7 @@ export function ClientesPage() {
             <TabsContent value="active">
               <Card>
                 <CardContent className="p-6">
-                  <p className="text-gray-600">Clientes ativos...</p>
+                  <p className="text-muted-foreground">Clientes ativos...</p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -381,7 +309,7 @@ export function ClientesPage() {
             <TabsContent value="vip">
               <Card>
                 <CardContent className="p-6">
-                  <p className="text-gray-600">Clientes VIP...</p>
+                  <p className="text-muted-foreground">Clientes VIP...</p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -389,7 +317,7 @@ export function ClientesPage() {
             <TabsContent value="new">
               <Card>
                 <CardContent className="p-6">
-                  <p className="text-gray-600">Novos clientes...</p>
+                  <p className="text-muted-foreground">Novos clientes...</p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -408,7 +336,7 @@ export function ClientesPage() {
               {selectedClient && (
                 <div className="space-y-6">
                   {/* Client Summary */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-sm">Informações Pessoais</CardTitle>
@@ -423,21 +351,21 @@ export function ClientesPage() {
                             </div>
                             <div>
                               <p className="font-medium">{selectedClient.name}</p>
-                              <p className="text-sm text-gray-500">{selectedClient.document}</p>
+                              <p className="text-sm text-muted-foreground">{selectedClient.document}</p>
                             </div>
                           </div>
                           <div className="space-y-1 text-sm">
                             <div className="flex items-center gap-2">
-                              <Mail className="h-4 w-4 text-gray-400" />
+                              <Mail className="h-4 w-4 text-muted-foreground" />
                               {selectedClient.email}
                             </div>
                             <div className="flex items-center gap-2">
-                              <Phone className="h-4 w-4 text-gray-400" />
+                              <Phone className="h-4 w-4 text-muted-foreground" />
                               {selectedClient.phone}
                             </div>
                             {selectedClient.birthDate && (
                               <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-gray-400" />
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
                                 {new Date(selectedClient.birthDate).toLocaleDateString('pt-BR')}
                               </div>
                             )}
@@ -453,24 +381,24 @@ export function ClientesPage() {
                       <CardContent>
                         <div className="space-y-3">
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Total de Pedidos:</span>
+                            <span className="text-sm text-muted-foreground">Total de Pedidos:</span>
                             <span className="font-medium">{selectedClient.totalOrders}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Total Gasto:</span>
-                            <span className="font-medium text-green-600">
+                            <span className="text-sm text-muted-foreground">Total Gasto:</span>
+                            <span className="font-medium text-success">
                               {formatCurrency(selectedClient.totalSpent)}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-sm text-gray-600">Ticket Médio:</span>
+                            <span className="text-sm text-muted-foreground">Ticket Médio:</span>
                             <span className="font-medium">
                               {formatCurrency(selectedClient.averageTicket)}
                             </span>
                           </div>
                           {selectedClient.lastOrderDate && (
                             <div className="flex justify-between">
-                              <span className="text-sm text-gray-600">Último Pedido:</span>
+                              <span className="text-sm text-muted-foreground">Último Pedido:</span>
                               <span className="font-medium">
                                 {new Date(selectedClient.lastOrderDate).toLocaleDateString('pt-BR')}
                               </span>
@@ -487,7 +415,7 @@ export function ClientesPage() {
                       <CardContent>
                         <div className="space-y-1 text-sm">
                           <div className="flex items-start gap-2">
-                            <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                             <div>
                               <p>{selectedClient.address.street}, {selectedClient.address.number}</p>
                               {selectedClient.address.complement && (
@@ -527,7 +455,7 @@ export function ClientesPage() {
                           {selectedClient.notes && (
                             <div>
                               <p className="text-sm font-medium mb-2">Observações:</p>
-                              <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                              <p className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
                                 {selectedClient.notes}
                               </p>
                             </div>
@@ -543,14 +471,9 @@ export function ClientesPage() {
                 <Button variant="outline" onClick={() => setClientDetailsOpen(false)}>
                   Fechar
                 </Button>
-                <Button>
-                  Editar Cliente
-                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
-      </AppShell>
-    </RoleGuard>
   );
 }

@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/PageStates';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { FeedbackService } from '@/services/FeedbackService';
@@ -88,7 +89,7 @@ export function DocumentUploadModal({ open, onOpenChange, onSubmit }: DocumentUp
     }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Enviar Documento Comprobatório</DialogTitle>
+          <DialogTitle>Enviar documento da empresa</DialogTitle>
           <DialogDescription>
             Envie um documento que comprove a validade do seu CNPJ (Cartão CNPJ, Contrato Social, etc.).
             Ele será analisado pela equipe NEOX.
@@ -98,30 +99,23 @@ export function DocumentUploadModal({ open, onOpenChange, onSubmit }: DocumentUp
         <div className="space-y-4">
           {/* File Upload Area */}
           <div className="space-y-2">
-            <Label>Documento *</Label>
+            <Label htmlFor="documento-arquivo">Documento *</Label>
             {selectedFile ? (
-              <div className="flex items-center justify-between p-3 border rounded-lg bg-green-50 border-green-200">
+              <div className="flex items-center justify-between p-3 border rounded-lg bg-success-muted border-success/30">
                 <div className="flex items-center space-x-2">
-                  <Check className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-medium text-green-800">
+                  <Check className="h-4 w-4 text-success" aria-hidden="true" />
+                  <span className="text-sm font-medium text-success break-all">
                     {selectedFile.name}
                   </span>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedFile(null)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                <IconButton type="button" label="Remover arquivo selecionado" icon={X} onClick={() => setSelectedFile(null)} />
               </div>
             ) : (
               <div
                 className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                   dragActive 
-                    ? 'border-primary bg-primary/5' 
-                    : 'border-gray-300 hover:border-primary hover:bg-primary/5'
+                    ? 'border-primary bg-primary-muted' 
+                    : 'border-border hover:border-primary hover:bg-primary-muted'
                 }`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
@@ -129,6 +123,7 @@ export function DocumentUploadModal({ open, onOpenChange, onSubmit }: DocumentUp
                 onDrop={handleDrop}
               >
                 <input
+                  id="documento-arquivo"
                   type="file"
                   accept="application/pdf,image/jpeg,image/png,image/webp"
                   onChange={(e) => {
@@ -138,12 +133,12 @@ export function DocumentUploadModal({ open, onOpenChange, onSubmit }: DocumentUp
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
                 <div className="space-y-2">
-                  <FileText className="mx-auto h-8 w-8 text-gray-400" />
+                  <FileText className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
                   <div>
                     <p className="text-sm font-medium">
                       Arraste um arquivo aqui ou clique para selecionar
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-muted-foreground">
                       PDF, JPG, PNG ou WEBP (máx. 10MB)
                     </p>
                   </div>
@@ -181,7 +176,7 @@ export function DocumentUploadModal({ open, onOpenChange, onSubmit }: DocumentUp
             ) : (
               <>
                 <Upload className="mr-2 h-4 w-4" />
-                Enviar Documento
+                Enviar documento
               </>
             )}
           </Button>

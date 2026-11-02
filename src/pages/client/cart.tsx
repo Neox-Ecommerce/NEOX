@@ -1,223 +1,203 @@
-import { useState, type FormEvent, type InputHTMLAttributes } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ShoppingCart, Plus, Minus, Trash2, ArrowLeft, Package } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Info, Package, ShoppingCart, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { ToastAction } from '@/components/ui/toast';
+import { EmptyState, ErrorState, IconButton, PageHeader, PageLoader } from '@/components/PageStates';
+import { toast } from '@/hooks/use-toast';
+import { loginPath } from '@/lib/navigation';
 import { formatCurrency } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
-import { CartService, type CartItem } from '@/services/CartService';
-import { CheckoutService } from '@/services/CheckoutService';
-import { FeedbackService } from '@/services/FeedbackService';
+import type { CartItem } from '@/services/CartService';
+import { CheckoutService, type QuoteGroup } from '@/services/CheckoutService';
+import { QuantityStepper } from './QuantityStepper';
+import { useCart } from './useCart';
 
-const EMPTY_ADDRESS = { street: '', number: '', complement: '', neighborhood: '', city: '', state: '', zipCode: '' };
+function groupByStore(items: CartItem[]) {
+  const groups = new Map<string, { storeId: string; storeName: string; items: CartItem[] }>();
+  items.forEach((i) => {
+    const g = groups.get(i.storeId) ?? { storeId: i.storeId, storeName: i.storeName, items: [] };
+    g.items.push(i);
+    groups.set(i.storeId, g);
+  });
+  return [...groups.values()];
+}
 
 export function CartPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [address, setAddress] = useState(EMPTY_ADDRESS);
-  const [phone, setPhone] = useState(user?.phone ?? '');
-  const [cpf, setCpf] = useState('');
-  const [couponCode, setCouponCode] = useState('');
-
-  const { data: cartItems = [], isLoading } = useQuery({ queryKey: ['cart'], queryFn: CartService.getCart });
-
-  const onCartChange = {
-    onSuccess: (items: CartItem[]) => queryClient.setQueryData(['cart'], items),
-    onError: (error: Error) => FeedbackService.error(error.message),
-  };
-  const updateMutation = useMutation({ mutationFn: CartService.updateQuantity, ...onCartChange });
-  const removeMutation = useMutation({ mutationFn: CartService.removeItem, ...onCartChange });
-
-  const checkoutMutation = useMutation({
-    mutationFn: CheckoutService.checkout,
-    onSuccess: (result) => {
-      queryClient.setQueryData(['cart'], []);
-      queryClient.invalidateQueries({ queryKey: ['my-orders'] });
-      if (result.redirectUrl) {
-        window.location.href = result.redirectUrl;
-        return;
-      }
-      FeedbackService.success(
-        `Pedido${result.orders.length > 1 ? 's' : ''} ${result.orders.map((o) => o.code).join(', ')} criado${result.orders.length > 1 ? 's' : ''}!`,
-        'A loja vai combinar o pagamento com você.'
-      );
-      navigate('/cliente#pedidos');
-    },
-    onError: (error: Error) => FeedbackService.error(error.message),
+  const cart = useCart();
+  const { items, mode } = cart;
+  // Frete e total reais por loja vêm da API (mesma regra do checkout); a chave muda a cada alteração do carrinho.
+  const signature = items.map((i) => `${i.productId}:${i.quantity}`).join(',');
+  const quote = useQuery({
+    queryKey: ['checkout-quote', signature],
+    queryFn: () => CheckoutService.quote(),
+    enabled: mode === 'client' && items.length > 0,
   });
+  const quoteByStore = new Map<string, QuoteGroup>((quote.data?.groups ?? []).map((g) => [g.storeId, g]));
 
-  const setQty = (item: CartItem, quantity: number) => {
-    if (quantity < 1) return removeMutation.mutate(item.productId);
-    if (quantity > item.stock) return FeedbackService.error(`Apenas ${item.stock} unidade(s) disponível(is)`);
-    updateMutation.mutate({ productId: item.productId, quantity });
-  };
-
-  const handleCheckout = (e: FormEvent) => {
-    e.preventDefault();
-    const required = [address.street, address.number, address.neighborhood, address.city, address.state, address.zipCode, phone, cpf];
-    if (required.some((v) => !v.trim())) {
-      FeedbackService.error('Preencha endereço, telefone e CPF');
-      return;
-    }
-    checkoutMutation.mutate({
-      shippingAddress: { ...address, state: address.state.toUpperCase(), complement: address.complement || undefined, country: 'Brasil' },
-      customer: { phone, document: cpf.replace(/\D/g, '') },
-      couponCode: couponCode.trim() || undefined,
+  const remove = async (item: CartItem) => {
+    if (!(await cart.remove(item))) return;
+    toast({
+      title: 'Item removido',
+      description: item.name,
+      action: (
+        <ToastAction altText="Desfazer remoção" onClick={() => cart.restore(item)}>
+          Desfazer
+        </ToastAction>
+      ),
     });
   };
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const field = (key: keyof typeof EMPTY_ADDRESS, label: string, props: InputHTMLAttributes<HTMLInputElement> = {}) => (
-    <div className="space-y-1">
-      <Label htmlFor={key}>{label}</Label>
-      <Input id={key} value={address[key]} onChange={(e) => setAddress({ ...address, [key]: e.target.value })} {...props} />
-    </div>
-  );
+  const header = <PageHeader title="Carrinho" breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Carrinho' }]} />;
+  const wrap = (children: React.ReactNode) => <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">{header}{children}</div>;
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link to="/cliente" className="flex items-center space-x-2">
-              <ShoppingCart className="h-6 w-6 text-primary" />
-              <span className="text-lg font-bold text-gray-900">Carrinho</span>
-            </Link>
-            <Link to="/cliente">
-              <Button variant="ghost">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Continuar Comprando
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+  if (mode === 'other') {
+    return wrap(
+      <EmptyState
+        icon={Info}
+        title="Esta conta não faz compras"
+        description="Contas de lojista e de administrador não compram na NEOX. Para comprar, saia e entre com uma conta de cliente."
+      />,
+    );
+  }
+  if (cart.isLoading) return wrap(<PageLoader />);
+  if (cart.error) return wrap(<ErrorState error={cart.error} onRetry={() => cart.refetch()} />);
+  if (items.length === 0) {
+    return wrap(
+      <EmptyState
+        icon={ShoppingCart}
+        title="Seu carrinho está vazio"
+        description="Explore a vitrine e adicione produtos."
+        action={<Button asChild><Link to="/buscar">Explorar produtos</Link></Button>}
+      />,
+    );
+  }
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {isLoading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        ) : cartItems.length === 0 ? (
-          <div className="text-center py-12">
-            <ShoppingCart className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900">Seu carrinho está vazio</h3>
-            <p className="mt-2 text-gray-600">Adicione produtos ao carrinho para continuar</p>
-            <Link to="/cliente">
-              <Button className="mt-4">Explorar Produtos</Button>
-            </Link>
-          </div>
-        ) : (
-          <form onSubmit={handleCheckout} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-4">
-              <h2 className="text-2xl font-bold text-gray-900">Itens no Carrinho ({cartItems.length})</h2>
+  const groups = groupByStore(items);
+  const subtotal = items.reduce((n, i) => n + i.subtotal, 0);
+  const total = mode === 'client' && quote.data ? quote.data.total : null;
+  const checkoutHref = mode === 'guest' ? loginPath('/checkout') : '/checkout';
 
-              {cartItems.map((item) => (
-                <Card key={item.id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-4">
-                      {item.image ? (
-                        <img src={item.image} alt={item.name} className="h-20 w-20 rounded-lg object-cover" />
-                      ) : (
-                        <div className="h-20 w-20 rounded-lg bg-gray-100 flex items-center justify-center">
-                          <Package className="h-8 w-8 text-gray-400" />
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <Link to={`/produto/${item.productId}`} className="font-medium text-gray-900 hover:underline">{item.name}</Link>
-                        <p className="text-sm text-gray-500">{item.storeName}</p>
-                        <p className="text-lg font-bold text-primary mt-1">
-                          {formatCurrency(item.price)}
-                          {item.price < item.originalPrice && (
-                            <span className="ml-2 text-sm text-gray-500 line-through font-normal">{formatCurrency(item.originalPrice)}</span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Button type="button" variant="outline" size="icon" onClick={() => setQty(item, item.quantity - 1)}>
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <Input
-                          type="number"
-                          value={item.quantity}
-                          className="w-16 text-center"
-                          min={1}
-                          max={item.stock}
-                          onChange={(e) => {
-                            const q = parseInt(e.target.value, 10);
-                            if (q > 0) setQty(item, q);
-                          }}
-                        />
-                        <Button type="button" variant="outline" size="icon" onClick={() => setQty(item, item.quantity + 1)}>
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <Button type="button" variant="ghost" size="icon" className="text-red-600" aria-label="Remover"
-                        onClick={() => removeMutation.mutate(item.productId)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-
-              <Card>
-                <CardContent className="p-6 space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Endereço de entrega</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="sm:col-span-2">{field('street', 'Rua *')}</div>
-                    {field('number', 'Número *')}
-                    {field('complement', 'Complemento')}
-                    {field('neighborhood', 'Bairro *')}
-                    {field('zipCode', 'CEP *', { placeholder: '00000-000', maxLength: 9 })}
-                    <div className="sm:col-span-2">{field('city', 'Cidade *')}</div>
-                    {field('state', 'UF *', { maxLength: 2, placeholder: 'SP' })}
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 pt-2">Seus dados</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <Label htmlFor="phone">Telefone *</Label>
-                      <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(00) 00000-0000" />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="document">CPF *</Label>
-                      <Input id="document" value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" maxLength={14} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="lg:col-span-1">
-              <Card className="sticky top-8">
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumo do Pedido</h3>
-
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Subtotal</span>
-                      <span className="font-medium">{formatCurrency(subtotal)}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="coupon">Cupom de desconto</Label>
-                      <Input id="coupon" value={couponCode} onChange={(e) => setCouponCode(e.target.value.toUpperCase())} />
-                    </div>
-                    <p className="text-xs text-gray-500">Frete e desconto do cupom são calculados por loja ao finalizar.</p>
-                  </div>
-
-                  <Button type="submit" className="w-full mt-6" size="lg" disabled={checkoutMutation.isPending}>
-                    {checkoutMutation.isPending ? 'Finalizando...' : 'Finalizar Compra'}
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </form>
+  return wrap(
+    <div className="grid grid-cols-1 gap-6 pb-32 lg:grid-cols-3 lg:pb-0">
+      <div className="space-y-4 lg:col-span-2">
+        {groups.length > 1 && (
+          <p className="flex gap-2 rounded-lg border border-info/20 bg-info-muted p-3 text-sm text-info">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            Seu carrinho tem produtos de {groups.length} lojas. Ao finalizar, serão criados {groups.length} pedidos, um por loja, cada um com seu frete.
+          </p>
         )}
+        {groups.map((g) => {
+          const q = quoteByStore.get(g.storeId);
+          return (
+            <section key={g.storeId} aria-labelledby={`loja-${g.storeId}`} className="rounded-lg border bg-card">
+              <h2 id={`loja-${g.storeId}`} className="border-b px-4 py-3 font-semibold">
+                <Link to={`/lojas/${g.storeId}`} className="hover:underline">{g.storeName}</Link>
+              </h2>
+              <ul className="divide-y">
+                {g.items.map((item) => (
+                  <li key={item.productId} className="flex gap-3 p-4">
+                    <Link to={`/produto/${item.productId}`} className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-muted" tabIndex={-1} aria-hidden="true">
+                      {item.image ? (
+                        <img src={item.image} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center"><Package className="h-6 w-6 text-muted-foreground" /></span>
+                      )}
+                    </Link>
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <Link to={`/produto/${item.productId}`} className="line-clamp-2 text-sm font-medium hover:underline">{item.name}</Link>
+                        <IconButton
+                          label={`Remover ${item.name}`}
+                          icon={Trash2}
+                          className="-mr-2 -mt-2 h-11 w-11 shrink-0 text-destructive hover:text-destructive"
+                          disabled={cart.isPending(item.productId)}
+                          onClick={() => remove(item)}
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <QuantityStepper
+                          value={item.quantity}
+                          max={item.stock}
+                          name={item.name}
+                          disabled={cart.isPending(item.productId)}
+                          onChange={(v) => cart.setQuantity(item, v)}
+                        />
+                        <div className="text-right">
+                          <p className="font-semibold text-primary">{formatCurrency(item.subtotal)}</p>
+                          {item.quantity > 1 && <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} cada</p>}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <dl className="space-y-1 border-t px-4 py-3 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-muted-foreground">Frete</dt>
+                  <dd>
+                    {mode === 'guest' ? 'calculado no checkout' : q ? (q.shippingCost === 0 ? 'Grátis' : formatCurrency(q.shippingCost)) : quote.isError ? '—' : 'calculando…'}
+                  </dd>
+                </div>
+                {q && (
+                  <div className="flex justify-between font-medium">
+                    <dt>Total da loja</dt>
+                    <dd>{formatCurrency(q.total)}</dd>
+                  </div>
+                )}
+              </dl>
+            </section>
+          );
+        })}
       </div>
-    </div>
+
+      <aside className="lg:col-span-1">
+        <div className="space-y-3 rounded-lg border bg-card p-4 lg:sticky lg:top-24">
+          <h2 className="text-lg font-semibold">Resumo</h2>
+          <dl className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Subtotal</dt>
+              <dd>{formatCurrency(subtotal)}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-muted-foreground">Frete</dt>
+              <dd>
+                {total != null
+                  ? formatCurrency(quote.data!.groups.reduce((n, g) => n + g.shippingCost, 0))
+                  : 'calculado no checkout'}
+              </dd>
+            </div>
+            <div className="flex justify-between border-t pt-2 text-base font-semibold">
+              <dt>Total</dt>
+              <dd className="text-primary">{formatCurrency(total ?? subtotal)}</dd>
+            </div>
+          </dl>
+          {quote.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              {quote.error instanceof Error ? quote.error.message : 'Não foi possível calcular o frete.'}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">Cupom de desconto é aplicado na etapa de revisão.</p>
+          <Button asChild className="hidden w-full lg:inline-flex">
+            <Link to={checkoutHref}>Continuar para entrega</Link>
+          </Button>
+          {mode === 'guest' && (
+            <p className="text-xs text-muted-foreground">Você vai entrar ou criar sua conta antes da entrega. Seu carrinho será mantido.</p>
+          )}
+        </div>
+      </aside>
+
+      {/* Barra fixa no celular, acima da navegação inferior */}
+      <div className="fixed inset-x-0 bottom-14 z-20 border-t bg-card/95 p-3 backdrop-blur lg:hidden">
+        <div className="flex items-center gap-3">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">{total != null ? 'Total com frete' : 'Subtotal'}</p>
+            <p className="font-semibold text-primary">{formatCurrency(total ?? subtotal)}</p>
+          </div>
+          <Button asChild className="flex-1">
+            <Link to={checkoutHref}>Continuar para entrega</Link>
+          </Button>
+        </div>
+      </div>
+    </div>,
   );
 }

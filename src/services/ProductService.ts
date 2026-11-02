@@ -1,4 +1,5 @@
 import { api, withDates } from '@/lib/api';
+import { stockLevel } from '@/components/StatusBadge';
 
 export interface Product {
   id: string;
@@ -14,6 +15,7 @@ export interface Product {
   marca?: string;
   sku?: string;
   desconto?: number;
+  minStock?: number; // estoque mínimo (padrão 5): base do alerta de estoque baixo
   lojaId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -114,8 +116,8 @@ export const ProductService = {
       total: products.length,
       ativo: products.filter((p) => p.ativo).length,
       inativo: products.filter((p) => !p.ativo).length,
-      estoqueBaixo: products.filter((p) => p.estoque > 0 && p.estoque <= 5).length,
-      esgotado: products.filter((p) => p.estoque === 0).length,
+      estoqueBaixo: products.filter((p) => stockLevel(p.estoque, p.minStock) === 'low').length,
+      esgotado: products.filter((p) => stockLevel(p.estoque, p.minStock) === 'out').length,
     };
   },
 };

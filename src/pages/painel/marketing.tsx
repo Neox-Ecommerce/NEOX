@@ -15,9 +15,9 @@ import {
   Bell,
   Info
 } from 'lucide-react';
-import { AppShell } from '@/components/AppShell';
-import { RoleGuard } from '@/components/RoleGuard';
 import { Button } from '@/components/ui/button';
+import { MetricCard } from '@/components/MetricCard';
+import { ErrorState, IconButton, PageLoader, PageHeader } from '@/components/PageStates';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -105,22 +105,22 @@ export function MarketingPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
+  const { data: campaigns = [], isLoading: campaignsLoading, error: loadError0, refetch: reload0 } = useQuery({
     queryKey: ['campaigns', user?.lojaId],
     queryFn: () => MarketingService.getCampaigns()
   });
 
-  const { data: coupons = [], isLoading: couponsLoading } = useQuery({
+  const { data: coupons = [], isLoading: couponsLoading, error: loadError1, refetch: reload1 } = useQuery({
     queryKey: ['coupons', user?.lojaId],
     queryFn: () => MarketingService.getCoupons()
   });
 
-  const { data: affiliates = [], isLoading: affiliatesLoading } = useQuery({
+  const { data: affiliates = [], isLoading: affiliatesLoading, error: loadError2, refetch: reload2 } = useQuery({
     queryKey: ['affiliates', user?.lojaId],
     queryFn: () => MarketingService.getAffiliates()
   });
 
-  const { data: marketingStats } = useQuery({
+  const { data: marketingStats, error: loadError3, refetch: reload3 } = useQuery({
     queryKey: ['marketing-stats', user?.lojaId],
     queryFn: () => MarketingService.getMarketingStats()
   });
@@ -351,90 +351,28 @@ export function MarketingPage() {
   };
 
   if (campaignsLoading || couponsLoading || affiliatesLoading) {
-    return (
-      <RoleGuard requiredRole="EMPREENDEDOR">
-        <AppShell>
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </AppShell>
-      </RoleGuard>
-    );
+    return <PageLoader />;
   }
 
+  const loadError = loadError0 || loadError1 || loadError2 || loadError3;
+  if (loadError) return <ErrorState error={loadError} onRetry={() => { reload0(); reload1(); reload2(); reload3(); }} />;
+
   return (
-    <RoleGuard requiredRole="EMPREENDEDOR">
-      <AppShell>
-        <div className="p-6 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Marketing
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Gerencie campanhas, cupons e afiliados
-              </p>
-            </div>
-          </div>
+    <div className="space-y-6">
+          <PageHeader
+            title="Cupons e campanhas"
+            description="Gerencie campanhas, cupons e afiliados"
+          />
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Campanhas Ativas</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {marketingStats?.activeCampaigns || 0}
-                    </p>
-                  </div>
-                  <Megaphone className="h-8 w-8 text-blue-600" />
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <MetricCard title="Campanhas Ativas" value={marketingStats?.activeCampaigns || 0} icon={Megaphone} />
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Taxa de Abertura</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {marketingStats?.emailOpenRate || 0}%
-                    </p>
-                  </div>
-                  <Mail className="h-8 w-8 text-green-600" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Taxa de Abertura" value={`${marketingStats?.emailOpenRate || 0}%`} icon={Mail} />
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Cupons Ativos</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {marketingStats?.activeCoupons || 0}
-                    </p>
-                  </div>
-                  <Gift className="h-8 w-8 text-purple-600" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Cupons Ativos" value={marketingStats?.activeCoupons || 0} icon={Gift} />
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Afiliados Ativos</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {marketingStats?.activeAffiliates || 0}
-                    </p>
-                  </div>
-                  <UserCheck className="h-8 w-8 text-yellow-600" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Afiliados Ativos" value={marketingStats?.activeAffiliates || 0} icon={UserCheck} />
           </div>
 
           <Tabs defaultValue="campaigns" className="space-y-6">
@@ -447,7 +385,7 @@ export function MarketingPage() {
             <TabsContent value="campaigns" className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     placeholder="Buscar campanhas..."
                     value={searchQuery}
@@ -462,7 +400,7 @@ export function MarketingPage() {
                 </Button>
               </div>
 
-              <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200">
+              <div className="flex items-start gap-2 rounded-lg border border-info/30 bg-info-muted p-3 text-sm text-info">
                 <Info className="h-4 w-4 mt-0.5 shrink-0" />
                 <span>
                   Envio automático não configurado: as campanhas ficam registradas e agendadas aqui,
@@ -488,7 +426,7 @@ export function MarketingPage() {
                     <TableBody>
                       {filteredCampaigns.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                             Nenhuma campanha cadastrada
                           </TableCell>
                         </TableRow>
@@ -498,18 +436,18 @@ export function MarketingPage() {
                         return (
                           <TableRow key={campaign.id}>
                             <TableCell>
-                              <div className="font-medium text-gray-900 dark:text-white">
+                              <div className="font-medium text-foreground">
                                 {campaign.name}
                               </div>
                               {campaign.subject && (
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
+                                <div className="text-sm text-muted-foreground">
                                   {campaign.subject}
                                 </div>
                               )}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <CampaignIcon className="h-4 w-4 text-gray-400" />
+                                <CampaignIcon className="h-4 w-4 text-muted-foreground" />
                                 <span className="capitalize">{campaign.type}</span>
                               </div>
                             </TableCell>
@@ -528,18 +466,18 @@ export function MarketingPage() {
                             <TableCell>
                               <div className="space-y-1 text-sm">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-gray-500">Enviados:</span>
+                                  <span className="text-muted-foreground">Enviados:</span>
                                   <span className="font-medium">{campaign.stats.sent}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-gray-500">Abertos:</span>
+                                  <span className="text-muted-foreground">Abertos:</span>
                                   <span className="font-medium">
                                     {campaign.stats.opened} ({campaign.stats.sent ? Math.round(campaign.stats.opened / campaign.stats.sent * 100) : 0}%)
                                   </span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-gray-500">Conversões:</span>
-                                  <span className="font-medium text-green-600">
+                                  <span className="text-muted-foreground">Conversões:</span>
+                                  <span className="font-medium text-success">
                                     {campaign.stats.converted}
                                   </span>
                                 </div>
@@ -549,19 +487,19 @@ export function MarketingPage() {
                               {campaign.sentDate ? (
                                 <div className="text-sm">
                                   <div>Enviada em:</div>
-                                  <div className="text-gray-500">
+                                  <div className="text-muted-foreground">
                                     {new Date(campaign.sentDate).toLocaleDateString('pt-BR')}
                                   </div>
                                 </div>
                               ) : campaign.scheduledDate ? (
                                 <div className="text-sm">
                                   <div>Agendada para:</div>
-                                  <div className="text-gray-500">
+                                  <div className="text-muted-foreground">
                                     {new Date(campaign.scheduledDate).toLocaleDateString('pt-BR')}
                                   </div>
                                 </div>
                               ) : (
-                                <div className="text-sm text-gray-500">
+                                <div className="text-sm text-muted-foreground">
                                   Não agendada
                                 </div>
                               )}
@@ -607,7 +545,7 @@ export function MarketingPage() {
             <TabsContent value="coupons" className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     placeholder="Buscar cupons..."
                     value={searchQuery}
@@ -641,7 +579,7 @@ export function MarketingPage() {
                     <TableBody>
                       {filteredCoupons.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                             Nenhum cupom cadastrado
                           </TableCell>
                         </TableRow>
@@ -649,23 +587,16 @@ export function MarketingPage() {
                       {filteredCoupons.map((coupon) => (
                         <TableRow key={coupon.id}>
                           <TableCell>
-                            <div className="font-medium text-gray-900 dark:text-white">
+                            <div className="font-medium text-foreground">
                               {coupon.name}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm font-mono">
+                              <code className="bg-muted px-2 py-1 rounded text-sm font-mono">
                                 {coupon.code}
                               </code>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => copyCouponCode(coupon.code)}
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
+                              <IconButton label="Copiar código" icon={Copy} onClick={() => copyCouponCode(coupon.code)} />
                             </div>
                           </TableCell>
                           <TableCell>
@@ -682,7 +613,7 @@ export function MarketingPage() {
                             <div className="text-sm">
                               <div>{coupon.usageCount} usos</div>
                               {coupon.usageLimit && (
-                                <div className="text-gray-500">
+                                <div className="text-muted-foreground">
                                   de {coupon.usageLimit} ({Math.round(coupon.usageCount / coupon.usageLimit * 100)}%)
                                 </div>
                               )}
@@ -692,9 +623,9 @@ export function MarketingPage() {
                             <div className="text-sm">
                               <div>Até {new Date(coupon.validUntil).toLocaleDateString('pt-BR')}</div>
                               {new Date(coupon.validUntil) < new Date() ? (
-                                <div className="text-red-500">Expirado</div>
+                                <div className="text-destructive">Expirado</div>
                               ) : (
-                                <div className="text-gray-500">
+                                <div className="text-muted-foreground">
                                   {Math.ceil((new Date(coupon.validUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} dias restantes
                                 </div>
                               )}
@@ -733,7 +664,7 @@ export function MarketingPage() {
             <TabsContent value="affiliates" className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     placeholder="Buscar afiliados..."
                     value={searchQuery}
@@ -748,7 +679,7 @@ export function MarketingPage() {
                 </Button>
               </div>
 
-              <p className="text-sm text-gray-500 dark:text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 Vendas e comissões por afiliado ainda não são rastreadas automaticamente; os totais permanecem zerados.
               </p>
 
@@ -770,7 +701,7 @@ export function MarketingPage() {
                     <TableBody>
                       {filteredAffiliates.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-gray-500 py-8">
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                             Nenhum afiliado cadastrado
                           </TableCell>
                         </TableRow>
@@ -778,26 +709,19 @@ export function MarketingPage() {
                       {filteredAffiliates.map((affiliate) => (
                         <TableRow key={affiliate.id}>
                           <TableCell>
-                            <div className="font-medium text-gray-900 dark:text-white">
+                            <div className="font-medium text-foreground">
                               {affiliate.name}
                             </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                            <div className="text-sm text-muted-foreground">
                               {affiliate.email}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm font-mono">
+                              <code className="bg-muted px-2 py-1 rounded text-sm font-mono">
                                 {affiliate.referralCode}
                               </code>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => copyCouponCode(affiliate.referralCode)}
-                              >
-                                <Copy className="h-3 w-3" />
-                              </Button>
+                              <IconButton label="Copiar código" icon={Copy} onClick={() => copyCouponCode(affiliate.referralCode)} />
                             </div>
                           </TableCell>
                           <TableCell>
@@ -806,7 +730,7 @@ export function MarketingPage() {
                           <TableCell>
                             {formatCurrency(affiliate.totalSales)}
                           </TableCell>
-                          <TableCell className="font-semibold text-green-600">
+                          <TableCell className="font-semibold text-success">
                             {formatCurrency(affiliate.totalCommission)}
                           </TableCell>
                           <TableCell>
@@ -1174,7 +1098,5 @@ export function MarketingPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </AppShell>
-    </RoleGuard>
   );
 }

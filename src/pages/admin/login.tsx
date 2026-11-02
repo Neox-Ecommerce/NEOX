@@ -1,171 +1,108 @@
 import { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2, Shield } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { FeedbackService } from '@/services/FeedbackService';
+import { safeNext } from '@/lib/navigation';
 
 const loginSchema = z.object({
-  email: z.string().email('Email inválido'),
-  password: z.string().min(1, 'Senha é obrigatória'),
+  email: z.string().trim().email('E-mail inválido'),
+  password: z.string().min(1, 'Informe a senha'),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const { login, isAuthenticated, user } = useAuth();
+  const [formError, setFormError] = useState('');
+  const { login, logout, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = safeNext(params.get('next'), '/admin');
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginFormData>({
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: ''
-    }
+    defaultValues: { email: '', password: '' },
   });
 
-  // Redirect if already authenticated as admin
-  if (isAuthenticated && user?.role === 'ADMIN') {
-    return <Navigate to="/admin/lojas" replace />;
-  }
-
-  // Redirect if authenticated but not as admin
-  if (isAuthenticated && user?.role !== 'ADMIN') {
-    return <Navigate to="/unauthorized" replace />;
-  }
+  if (isAuthenticated && user?.role === 'ADMIN') return <Navigate to={next} replace />;
 
   const onSubmit = async (data: LoginFormData) => {
-    setIsLoading(true);
+    setFormError('');
     try {
-      const user = await login(data.email, data.password);
-      
-      if (user.role !== 'ADMIN') {
-        FeedbackService.error('Acesso restrito a administradores');
-        navigate('/unauthorized');
+      const logged = await login(data.email, data.password);
+      if (logged.role !== 'ADMIN') {
+        logout();
+        setFormError('Esta conta não tem acesso à área administrativa.');
         return;
       }
-      
-      FeedbackService.success('Login realizado com sucesso!');
-      navigate('/admin/lojas');
-    } catch {
-      FeedbackService.error('Credenciais inválidas');
-    } finally {
-      setIsLoading(false);
+      navigate(next, { replace: true });
+    } catch (e) {
+      setFormError(e instanceof Error && e.message ? e.message : 'E-mail ou senha incorretos.');
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-white to-primary/10 flex items-center justify-center p-4">
+    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md">
-        {/* Logo and Title */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl mb-4">
-            <Shield className="h-8 w-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">NeoxStore</h1>
-          <p className="text-gray-600 mt-2">Painel Administrativo</p>
+        <div className="mb-8 text-center">
+          <img src="/logo.png" alt="" width={56} height={56} className="mx-auto mb-4 h-16 w-16" />
+          <p className="text-2xl font-bold text-foreground">NEOX</p>
+          <p className="mt-1 text-sm text-muted-foreground">Área administrativa</p>
         </div>
 
-        {/* Login Form */}
-        <Card className="shadow-xl border-0">
-          <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl font-semibold text-center">
-              Acesso Administrativo
-            </CardTitle>
-            <CardDescription className="text-center">
-              Área restrita para administradores da plataforma
-            </CardDescription>
+        <Card>
+          <CardHeader className="space-y-1">
+            <h1 className="text-xl font-semibold leading-none tracking-tight">Entrar como administrador</h1>
+            <CardDescription>Acesso restrito à equipe da plataforma.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+              {formError && (
+                <p role="alert" className="rounded-md border border-destructive/20 bg-destructive-muted p-3 text-sm text-destructive">
+                  {formError}
+                </p>
+              )}
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="admin@neoxstore.com"
-                  {...register('email')}
-                  className="h-11"
-                />
-                {errors.email && (
-                  <p className="text-sm text-red-500">{errors.email.message}</p>
-                )}
+                <Label htmlFor="email">E-mail</Label>
+                <Input id="email" type="email" autoComplete="username" autoFocus
+                  aria-invalid={!!errors.email} aria-describedby={errors.email ? 'email-erro' : undefined}
+                  {...register('email')} />
+                {errors.email && <p id="email-erro" className="text-sm text-destructive">{errors.email.message}</p>}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
                 <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Sua senha"
-                    {...register('password')}
-                    className="h-11 pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-11 w-11 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
+                  <Input id="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" className="pr-12"
+                    aria-invalid={!!errors.password} aria-describedby={errors.password ? 'password-erro' : undefined}
+                    {...register('password')} />
+                  <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0"
+                    aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={showPassword}
+                    onClick={() => setShowPassword((v) => !v)}>
+                    {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                   </Button>
                 </div>
-                {errors.password && (
-                  <p className="text-sm text-red-500">{errors.password.message}</p>
-                )}
+                {errors.password && <p id="password-erro" className="text-sm text-destructive">{errors.password.message}</p>}
               </div>
 
-              <Button
-                type="submit"
-                className="w-full h-11 text-base font-medium"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Entrando...
-                  </>
-                ) : (
-                  'Entrar'
-                )}
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                {isSubmitting ? 'Entrando…' : 'Entrar'}
               </Button>
             </form>
-
-            <div className="mt-6 text-center">
-              <Button 
-                variant="link" 
-                className="text-sm text-gray-600 hover:text-primary"
-                onClick={() => navigate('/auth')}
-              >
-                Voltar para login normal
-              </Button>
-            </div>
+            <p className="mt-6 text-center text-sm text-muted-foreground">
+              Não é administrador? <Link to="/entrar" className="text-primary hover:underline">Entrar na loja</Link>
+            </p>
           </CardContent>
         </Card>
-
-        {/* Footer */}
-        <div className="text-center mt-8 text-sm text-gray-500">
-          <p>© 2024 NeoxStore. Todos os direitos reservados.</p>
-        </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -199,10 +199,10 @@ export function StoreDataStep({ data, onComplete, onBack }: StoreDataStepProps) 
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-foreground mb-2">
           Dados da Loja
         </h2>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Informações comerciais da sua empresa
         </p>
       </div>
@@ -210,41 +210,41 @@ export function StoreDataStep({ data, onComplete, onBack }: StoreDataStepProps) 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Store Name Field */}
         <div>
-          <label htmlFor="storeName" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="storeName" className="block text-sm font-medium text-foreground/80 mb-2">
             Nome da Loja *
           </label>
           <div className="relative">
-            <Store className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Store className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <input
               id="storeName"
               type="text"
               value={formData.storeName}
               onChange={(e) => handleStoreNameChange(e.target.value)}
-              className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${
+              className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 ${
                 errors.storeName 
-                  ? 'border-red-500 bg-red-50' 
+                  ? 'border-destructive bg-destructive-muted' 
                   : formData.isStoreNameValid
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-primary bg-success-muted'
+                  : 'border-input hover:border-foreground/40'
               }`}
               placeholder="Nome da sua loja"
             />
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
               {isCheckingStoreName ? (
-                <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
               ) : formData.isStoreNameValid ? (
-                <CheckCircle className="w-5 h-5 text-green-500" />
+                <CheckCircle className="w-5 h-5 text-primary" />
               ) : null}
             </div>
           </div>
           {errors.storeName && (
-            <div className="mt-1 flex items-center space-x-1 text-red-600">
+            <div className="mt-1 flex items-center space-x-1 text-destructive">
               <AlertCircle className="w-4 h-4" />
               <p className="text-sm">{errors.storeName}</p>
             </div>
           )}
           {formData.isStoreNameValid && !errors.storeName && (
-            <div className="mt-1 flex items-center space-x-1 text-green-600">
+            <div className="mt-1 flex items-center space-x-1 text-primary">
               <CheckCircle className="w-4 h-4" />
               <p className="text-sm">Nome disponível!</p>
             </div>
@@ -253,36 +253,36 @@ export function StoreDataStep({ data, onComplete, onBack }: StoreDataStepProps) 
 
         {/* CNPJ Field */}
         <div>
-          <label htmlFor="cnpj" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="cnpj" className="block text-sm font-medium text-foreground/80 mb-2">
             CNPJ *
           </label>
           <div className="relative">
-            <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <input
               id="cnpj"
               type="text"
               value={formData.cnpj}
               onChange={(e) => handleCnpjChange(e.target.value)}
-              className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${
+              className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 ${
                 errors.cnpj 
-                  ? 'border-red-500 bg-red-50' 
+                  ? 'border-destructive bg-destructive-muted' 
                   : formData.isCnpjValid
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-primary bg-success-muted'
+                  : 'border-input hover:border-foreground/40'
               }`}
               placeholder="XX.XXX.XXX/XXXX-XX"
               maxLength={18}
             />
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
               {isCheckingCnpj ? (
-                <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+                <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
               ) : formData.isCnpjValid ? (
-                <CheckCircle className="w-5 h-5 text-green-500" />
+                <CheckCircle className="w-5 h-5 text-primary" />
               ) : null}
             </div>
           </div>
           {errors.cnpj && (
-            <div className="mt-1 flex items-center space-x-1 text-red-600">
+            <div className="mt-1 flex items-center space-x-1 text-destructive">
               <AlertCircle className="w-4 h-4" />
               <p className="text-sm">{errors.cnpj}</p>
             </div>
@@ -291,14 +291,14 @@ export function StoreDataStep({ data, onComplete, onBack }: StoreDataStepProps) 
 
         {/* Company Name Display */}
         {formData.companyName && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="bg-success-muted border border-success/30 rounded-lg p-4">
             <div className="flex items-center space-x-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+              <CheckCircle className="w-5 h-5 text-primary" />
               <div>
-                <p className="text-sm font-medium text-green-800">
+                <p className="text-sm font-medium text-success">
                   Empresa encontrada na Receita Federal:
                 </p>
-                <p className="text-sm text-green-700 font-semibold">
+                <p className="text-sm text-primary font-semibold">
                   {formData.companyName}
                 </p>
               </div>
@@ -311,14 +311,14 @@ export function StoreDataStep({ data, onComplete, onBack }: StoreDataStepProps) 
           <button
             type="button"
             onClick={onBack}
-            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition-all duration-200"
+            className="flex-1 bg-muted hover:bg-accent text-foreground/80 font-medium py-3 px-4 rounded-lg transition-all duration-200"
           >
             Voltar
           </button>
           <button
             type="submit"
             disabled={!formData.isStoreNameValid || !formData.isCnpjValid || isCheckingStoreName || isCheckingCnpj}
-            className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] focus:ring-4 focus:ring-green-500/30"
+            className="flex-1 bg-primary hover:bg-primary-hover disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed text-primary-foreground font-medium py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] focus:ring-4 focus:ring-ring/30"
           >
             Continuar
           </button>

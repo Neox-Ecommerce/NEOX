@@ -17,9 +17,9 @@ import {
   Sparkles,
   Zap
 } from 'lucide-react';
-import { AppShell } from '@/components/AppShell';
-import { RoleGuard } from '@/components/RoleGuard';
 import { Button } from '@/components/ui/button';
+import { MetricCard } from '@/components/MetricCard';
+import { ErrorState, PageLoader, PageHeader } from '@/components/PageStates';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -69,12 +69,12 @@ export function TrendsPage() {
   const queryClient = useQueryClient();
   const storeKey = user?.lojaId;
 
-  const { data: trends = [], isLoading } = useQuery({
+  const { data: trends = [], isLoading, error: loadError0, refetch: reload0 } = useQuery({
     queryKey: ['trends', storeKey],
     queryFn: () => TrendsService.getMyTrends()
   });
 
-  const { data: trendStats } = useQuery({
+  const { data: trendStats, error: loadError1, refetch: reload1 } = useQuery({
     queryKey: ['trend-stats', storeKey],
     queryFn: () => TrendsService.getTrendStats()
   });
@@ -210,96 +210,34 @@ export function TrendsPage() {
   ];
 
   if (isLoading) {
-    return (
-      <RoleGuard requiredRole="EMPREENDEDOR">
-        <AppShell>
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </AppShell>
-      </RoleGuard>
-    );
+    return <PageLoader />;
   }
 
-  return (
-    <RoleGuard requiredRole="EMPREENDEDOR">
-      <AppShell>
-        <div className="p-6 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <Sparkles className="h-8 w-8 text-primary" />
-                Trends da Loja
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Crie vídeos virais para promover seus produtos
-              </p>
-            </div>
+  const loadError = loadError0 || loadError1;
+  if (loadError) return <ErrorState error={loadError} onRetry={() => { reload0(); reload1(); }} />;
 
-            <Button onClick={() => setUploadModalOpen(true)} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+  return (
+    <div className="space-y-6">
+          <PageHeader
+            title="Trends da Loja"
+            description="Crie vídeos virais para promover seus produtos"
+            actions={<>
+              <Button onClick={() => setUploadModalOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Novo Trend
             </Button>
-          </div>
+            </>}
+          />
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-purple-100">Total de Trends</p>
-                    <p className="text-2xl font-bold">
-                      {trendStats?.totalTrends || 0}
-                    </p>
-                  </div>
-                  <Video className="h-8 w-8 text-purple-200" />
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <MetricCard title="Total de Trends" value={trendStats?.totalTrends || 0} icon={Video} />
 
-            <Card className="bg-gradient-to-r from-pink-500 to-pink-600 text-white">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-pink-100">Total de Views</p>
-                    <p className="text-2xl font-bold">
-                      {formatViews(trendStats?.totalViews || 0)}
-                    </p>
-                  </div>
-                  <Eye className="h-8 w-8 text-pink-200" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Total de Views" value={formatViews(trendStats?.totalViews || 0)} icon={Eye} />
 
-            <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-red-100">Total de Likes</p>
-                    <p className="text-2xl font-bold">
-                      {formatViews(trendStats?.totalLikes || 0)}
-                    </p>
-                  </div>
-                  <Heart className="h-8 w-8 text-red-200" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Total de Likes" value={formatViews(trendStats?.totalLikes || 0)} icon={Heart} />
 
-            <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-blue-100">Engajamento</p>
-                    <p className="text-2xl font-bold">
-                      {trendStats?.engagementRate || 0}%
-                    </p>
-                  </div>
-                  <TrendingUp className="h-8 w-8 text-blue-200" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Engajamento" value={`${trendStats?.engagementRate || 0}%`} icon={TrendingUp} />
           </div>
 
           <Tabs defaultValue="my-trends" className="space-y-6">
@@ -313,11 +251,11 @@ export function TrendsPage() {
               {trends.length === 0 ? (
                 <Card>
                   <CardContent className="p-12 text-center">
-                    <Video className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                    <Video className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium text-foreground mb-2">
                       Nenhum trend publicado ainda
                     </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                    <p className="text-muted-foreground mb-6">
                       Comece criando seu primeiro trend para promover seus produtos
                     </p>
                     <Button onClick={() => setUploadModalOpen(true)}>
@@ -356,14 +294,14 @@ export function TrendsPage() {
                       </div>
 
                       <CardContent className="p-4">
-                        <h3 className="font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">
+                        <h3 className="font-semibold text-foreground mb-2 line-clamp-2">
                           {trend.title}
                         </h3>
                         {trend.moderationReason && (
-                          <p className="text-xs text-red-600 mb-2">Moderação: {trend.moderationReason}</p>
+                          <p className="text-xs text-destructive mb-2">Moderação: {trend.moderationReason}</p>
                         )}
 
-                        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
                           <div className="flex items-center gap-1">
                             <Eye className="h-4 w-4" />
                             {formatViews(trend.views)}
@@ -379,7 +317,7 @@ export function TrendsPage() {
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                          <span className="text-xs text-muted-foreground">
                             {(trend.publishedAt ?? trend.createdAt).toLocaleDateString('pt-BR')}
                           </span>
                           <div className="flex items-center gap-2">
@@ -389,7 +327,7 @@ export function TrendsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-red-600"
+                              className="h-8 w-8 text-destructive"
                               onClick={() => handleDeleteTrend(trend.id, trend.title)}
                               disabled={deleteTrendMutation.isPending}
                               aria-label="Excluir trend"
@@ -414,15 +352,15 @@ export function TrendsPage() {
                   <CardContent>
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Views Totais</span>
+                        <span className="text-sm text-muted-foreground">Views Totais</span>
                         <span className="font-semibold">{formatViews(trendStats?.totalViews || 0)}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Taxa de Engajamento</span>
+                        <span className="text-sm text-muted-foreground">Taxa de Engajamento</span>
                         <span className="font-semibold">{trendStats?.engagementRate || 0}%</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-600">Conversão em Vendas</span>
+                        <span className="text-sm text-muted-foreground">Conversão em Vendas</span>
                         <span className="font-semibold">{trendStats?.conversionRate || 0}%</span>
                       </div>
                     </div>
@@ -435,13 +373,13 @@ export function TrendsPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-center">
-                      <p className="text-3xl font-bold text-green-600 mb-2">
+                      <p className="text-3xl font-bold text-success mb-2">
                         {formatCurrency(trendStats?.revenueGenerated || 0)}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         Vendas atribuídas aos trends
                       </p>
-                      <p className="text-xs text-gray-500 mt-2">
+                      <p className="text-xs text-muted-foreground mt-2">
                         A atribuição de vendas aos vídeos ainda não está disponível.
                       </p>
                     </div>
@@ -454,12 +392,12 @@ export function TrendsPage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Zap className="h-5 w-5 text-yellow-500" />
+                    <Zap className="h-5 w-5 text-warning" />
                     Trends em Alta na Plataforma
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-600 dark:text-gray-400">
+                  <p className="text-muted-foreground">
                     O ranking de trends da plataforma ainda não está disponível.
                   </p>
                 </CardContent>
@@ -486,16 +424,16 @@ export function TrendsPage() {
                   <Label>Vídeo *</Label>
                   {!selectedVideo ? (
                     <div
-                      className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer"
+                      className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer"
                       onDrop={handleDrop}
                       onDragOver={handleDragOver}
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      <FileVideo className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                      <p className="text-lg font-medium text-gray-700 mb-2">
+                      <FileVideo className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                      <p className="text-lg font-medium text-muted-foreground mb-2">
                         Arraste um vídeo aqui ou clique para selecionar
                       </p>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-muted-foreground">
                         MP4, WEBM ou MOV (máx. 100MB)
                       </p>
                       <input
@@ -542,7 +480,7 @@ export function TrendsPage() {
                     placeholder="Dê um título chamativo para seu trend..."
                     maxLength={100}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {trendData.title.length}/100 caracteres
                   </p>
                 </div>
@@ -558,7 +496,7 @@ export function TrendsPage() {
                     rows={4}
                     maxLength={500}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {trendData.description.length}/500 caracteres
                   </p>
                 </div>
@@ -625,7 +563,7 @@ export function TrendsPage() {
                 <Button
                   onClick={handleSubmit}
                   disabled={uploadTrendMutation.isPending || !selectedVideo || !trendData.title}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                 
                 >
                   {uploadTrendMutation.isPending ? (
                     <>
@@ -643,7 +581,5 @@ export function TrendsPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </AppShell>
-    </RoleGuard>
   );
 }

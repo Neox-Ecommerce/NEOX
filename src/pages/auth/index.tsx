@@ -1,106 +1,182 @@
 import { useState } from 'react';
-import { LoginForm } from './components/LoginForm';
-import { RegisterForm } from './components/RegisterForm';
-import { FloatingIcons } from './components/FloatingIcons';
-import { EntrepreneurRegistration } from './components/EntrepreneurRegistration';
-import { ArrowRight, Building } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/contexts/AuthContext';
+import { homeFor, safeNext } from '@/lib/navigation';
+import type { User } from '@/services/AuthService';
+import { FeedbackService } from '@/services/FeedbackService';
+import { GuestCartService } from '@/services/GuestCartService';
+import { Field } from '@/pages/client/AddressFields';
+import type { FieldErrors } from '@/pages/client/br';
+import { maskPhone } from '@/pages/client/br';
+import { AuthShell, PasswordInput } from './AuthShell';
 
-export function AuthPage() {
-  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'entrepreneur'>('login');
-  const handleEntrepreneurRegistration = () => {
-    setActiveTab('entrepreneur');
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+function FormError({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <p role="alert" className="rounded-md border border-destructive/20 bg-destructive-muted p-3 text-sm text-destructive">
+      {message}
+    </p>
+  );
+}
+
+/** Depois de entrar: leva o carrinho do visitante para a conta e volta para onde ele estava. */
+function useAfterAuth() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [params] = useSearchParams();
+  return async (user: User) => {
+    if (user.role === 'CLIENTE') {
+      const failed = await GuestCartService.mergeIntoApi();
+      await queryClient.invalidateQueries({ queryKey: ['cart'] });
+      if (failed) FeedbackService.info(`${failed} item(ns) do carrinho não estão mais disponíveis e foram removidos.`);
+    }
+    navigate(safeNext(params.get('next'), homeFor(user.role)), { replace: true });
+  };
+}
+
+function LoginTab() {
+  const { login } = useAuth();
+  const afterAuth = useAfterAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errs: FieldErrors = {};
+    if (!EMAIL.test(email.trim())) errs.email = 'Informe um e-mail válido';
+    if (!password) errs.password = 'Informe sua senha';
+    setErrors(errs);
+    setFormError(null);
+    if (Object.keys(errs).length) return;
+    setBusy(true);
+    try {
+      await afterAuth(await login(email.trim(), password));
+    } catch (err) {
+      setFormError(err instanceof Error && err.message === 'Credenciais inválidas' ? 'E-mail ou senha incorretos.' : err instanceof Error ? err.message : 'Não foi possível entrar.');
+    } finally {
+      setBusy(false);
+    }
   };
 
-  // Show entrepreneur registration flow
-  if (activeTab === 'entrepreneur') {
-    return <EntrepreneurRegistration />;
-  }
+  return (
+    <form onSubmit={submit} noValidate className="space-y-4">
+      <FormError message={formError} />
+      <Field id="login-email" label="E-mail" error={errors.email}>
+        {(p) => <Input {...p} type="email" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} />}
+      </Field>
+      <Field id="login-senha" label="Senha" error={errors.password}>
+        {(p) => <PasswordInput {...p} autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />}
+      </Field>
+      <div className="text-right">
+        <Link to="/recuperar-senha" className="text-sm font-medium text-primary hover:underline">Esqueci minha senha</Link>
+      </div>
+      <Button type="submit" className="w-full" disabled={busy}>
+        {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+        Entrar
+      </Button>
+    </form>
+  );
+}
+
+function RegisterTab() {
+  const { register } = useAuth();
+  const afterAuth = useAfterAuth();
+  const [data, setData] = useState({ name: '', email: '', phone: '', password: '' });
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const set = (k: keyof typeof data) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setData({ ...data, [k]: k === 'phone' ? maskPhone(e.target.value) : e.target.value });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errs: FieldErrors = {};
+    if (data.name.trim().length < 2) errs.name = 'Informe seu nome';
+    if (!EMAIL.test(data.email.trim())) errs.email = 'Informe um e-mail válido';
+    if (data.password.length < 6) errs.password = 'A senha precisa ter pelo menos 6 caracteres';
+    setErrors(errs);
+    setFormError(null);
+    if (Object.keys(errs).length) return;
+    setBusy(true);
+    try {
+      await afterAuth(await register({ name: data.name.trim(), email: data.email.trim(), password: data.password, phone: data.phone || undefined }));
+    } catch (err) {
+      setFormError(err instanceof Error && err.message === 'Email já cadastrado' ? 'Este e-mail já tem conta. Entre ou recupere sua senha.' : err instanceof Error ? err.message : 'Não foi possível criar a conta.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-40 left-40 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
-      </div>
+    <form onSubmit={submit} noValidate className="space-y-4">
+      <FormError message={formError} />
+      <Field id="cad-nome" label="Nome completo" error={errors.name}>
+        {(p) => <Input {...p} autoComplete="name" value={data.name} onChange={set('name')} />}
+      </Field>
+      <Field id="cad-email" label="E-mail" error={errors.email}>
+        {(p) => <Input {...p} type="email" autoComplete="email" inputMode="email" value={data.email} onChange={set('email')} />}
+      </Field>
+      <Field id="cad-telefone" label="Celular (opcional)">
+        {(p) => <Input {...p} type="tel" autoComplete="tel-national" placeholder="(00) 00000-0000" value={data.phone} onChange={set('phone')} />}
+      </Field>
+      <Field id="cad-senha" label="Senha" error={errors.password} hint="Mínimo de 6 caracteres.">
+        {(p) => <PasswordInput {...p} autoComplete="new-password" value={data.password} onChange={set('password')} />}
+      </Field>
+      <p className="text-xs text-muted-foreground">
+        Ao criar a conta você concorda com os{' '}
+        <Link to="/termos" className="text-primary hover:underline">Termos de uso</Link> e a{' '}
+        <Link to="/privacidade" className="text-primary hover:underline">Política de privacidade</Link>.
+      </p>
+      <Button type="submit" className="w-full" disabled={busy}>
+        {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+        Criar conta
+      </Button>
+    </form>
+  );
+}
 
-      <div className="w-full max-w-6xl mx-auto grid lg:grid-cols-2 gap-8 items-center relative z-10">
-        {/* Left side - Auth Card */}
-        <div className="w-full max-w-md mx-auto lg:mx-0">
-          <div className="bg-white rounded-2xl shadow-xl p-8 backdrop-blur-sm border border-white/20">
-            {/* Logo and Title */}
-            <div className="text-center mb-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">NeoxStore</h1>
-              <p className="text-gray-600">Bem-vindo de volta</p>
-            </div>
+export function AuthPage() {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get('aba') === 'cadastro' ? 'cadastro' : 'entrar';
+  const onTab = (v: string) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (v === 'cadastro') next.set('aba', 'cadastro');
+        else next.delete('aba');
+        return next;
+      },
+      { replace: true },
+    );
 
-            {/* Tab Navigation */}
-            <div className="flex bg-gray-100 rounded-lg p-1 mb-8">
-              <button
-                onClick={() => setActiveTab('login')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
-                  activeTab === 'login'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Entrar
-              </button>
-              <button
-                onClick={() => setActiveTab('register')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all duration-200 ${
-                  activeTab === 'register'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Criar Conta
-              </button>
-            </div>
-
-            {/* Form Content */}
-            <div className="transition-all duration-300 ease-in-out">
-              {activeTab === 'login' ? (
-                <LoginForm />
-              ) : (
-                <RegisterForm onEntrepreneurRegistration={handleEntrepreneurRegistration} />
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right side - Enhanced Marketing Content */}
-        <div className="hidden lg:block">
-          <div className="relative h-96 flex flex-col justify-center">
-            <FloatingIcons />
-
-            {/* Main Content */}
-            <div className="text-center z-10 space-y-6">
-              <div>
-                <h2 className="text-4xl font-bold text-gray-800 mb-4 leading-tight">
-                  Crie sua loja digital
-                </h2>
-                <p className="text-lg text-gray-600 max-w-lg mx-auto leading-relaxed">
-                  Crie sua loja, gerencie tudo e comece a vender em minutos!
-                </p>
-              </div>
-
-              {/* Entrepreneur CTA - Only button remaining */}
-              <div className="mt-8">
-                <button
-                  onClick={handleEntrepreneurRegistration}
-                  className="group inline-flex items-center space-x-2 bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105"
-                >
-                  <Building className="w-4 h-4" />
-                  <span>Cadastro Completo de Empreendedor</span>
-                  <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+  return (
+    <AuthShell
+      title={tab === 'cadastro' ? 'Crie sua conta' : 'Entre para comprar'}
+      description="Acompanhe seus pedidos e finalize compras mais rápido."
+      footer={
+        <>
+          Tem uma loja? <Link to="/vender" className="font-medium text-primary hover:underline">Sou lojista</Link>
+        </>
+      }
+    >
+      <Tabs value={tab} onValueChange={onTab}>
+        <TabsList className="mb-6 grid w-full grid-cols-2">
+          <TabsTrigger value="entrar" className="min-h-10">Entrar</TabsTrigger>
+          <TabsTrigger value="cadastro" className="min-h-10">Criar conta</TabsTrigger>
+        </TabsList>
+        <TabsContent value="entrar"><LoginTab /></TabsContent>
+        <TabsContent value="cadastro"><RegisterTab /></TabsContent>
+      </Tabs>
+    </AuthShell>
   );
 }

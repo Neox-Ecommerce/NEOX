@@ -15,9 +15,9 @@ import {
   FileText,
   Send
 } from 'lucide-react';
-import { AppShell } from '@/components/AppShell';
-import { RoleGuard } from '@/components/RoleGuard';
 import { Button } from '@/components/ui/button';
+import { MetricCard } from '@/components/MetricCard';
+import { ErrorState, PageLoader, PageHeader } from '@/components/PageStates';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -100,22 +100,22 @@ export function FinanceiroPage() {
     }
   };
 
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+  const { data: payments = [], isLoading: paymentsLoading, error: loadError0, refetch: reload0 } = useQuery({
     queryKey: ['payments'],
     queryFn: FinancialService.getPayments
   });
 
-  const { data: payouts = [], isLoading: payoutsLoading } = useQuery({
+  const { data: payouts = [], isLoading: payoutsLoading, error: loadError1, refetch: reload1 } = useQuery({
     queryKey: ['payouts'],
     queryFn: FinancialService.getPayouts
   });
 
-  const { data: bankAccounts = [], isLoading: bankAccountsLoading } = useQuery({
+  const { data: bankAccounts = [], isLoading: bankAccountsLoading, error: loadError2, refetch: reload2 } = useQuery({
     queryKey: ['bank-accounts'],
     queryFn: FinancialService.getBankAccounts
   });
 
-  const { data: financialStats } = useQuery({
+  const { data: financialStats, error: loadError3, refetch: reload3 } = useQuery({
     queryKey: ['financial-stats'],
     queryFn: FinancialService.getFinancialStats
   });
@@ -291,33 +291,18 @@ export function FinanceiroPage() {
   const banks = FinancialService.getBanks();
 
   if (paymentsLoading || payoutsLoading || bankAccountsLoading) {
-    return (
-      <RoleGuard requiredRole="EMPREENDEDOR">
-        <AppShell>
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </AppShell>
-      </RoleGuard>
-    );
+    return <PageLoader />;
   }
 
-  return (
-    <RoleGuard requiredRole="EMPREENDEDOR">
-      <AppShell>
-        <div className="p-6 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Financeiro
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Gerencie pagamentos, repasses e finanças da sua loja
-              </p>
-            </div>
+  const loadError = loadError0 || loadError1 || loadError2 || loadError3;
+  if (loadError) return <ErrorState error={loadError} onRetry={() => { reload0(); reload1(); reload2(); reload3(); }} />;
 
-            <div className="flex items-center gap-3">
+  return (
+    <div className="space-y-6">
+          <PageHeader
+            title="Financeiro"
+            description="Gerencie pagamentos, repasses e finanças da sua loja"
+            actions={<>
               <Button variant="outline" onClick={() => setPaymentModalOpen(true)}>
                 <CreditCard className="h-4 w-4 mr-2" />
                 Registrar Pagamento
@@ -326,66 +311,18 @@ export function FinanceiroPage() {
                 <ArrowUpRight className="h-4 w-4 mr-2" />
                 Solicitar Repasse
               </Button>
-            </div>
-          </div>
+            </>}
+          />
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Receita Total</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(financialStats?.totalRevenue || 0)}
-                    </p>
-                  </div>
-                  <DollarSign className="h-8 w-8 text-green-600" />
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <MetricCard title="Receita Total" value={formatCurrency(financialStats?.totalRevenue || 0)} icon={DollarSign} />
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Taxas</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(financialStats?.totalFees || 0)}
-                    </p>
-                  </div>
-                  <ArrowDownRight className="h-8 w-8 text-red-600" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Taxas" value={formatCurrency(financialStats?.totalFees || 0)} icon={ArrowDownRight} />
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Receita Líquida</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(financialStats?.netRevenue || 0)}
-                    </p>
-                  </div>
-                  <Wallet className="h-8 w-8 text-blue-600" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Receita Líquida" value={formatCurrency(financialStats?.netRevenue || 0)} icon={Wallet} />
 
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Disponível para Repasse</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {formatCurrency(financialStats?.availableForPayout || 0)}
-                    </p>
-                  </div>
-                  <Bank className="h-8 w-8 text-purple-600" />
-                </div>
-              </CardContent>
-            </Card>
+            <MetricCard title="Disponível para Repasse" value={formatCurrency(financialStats?.availableForPayout || 0)} icon={Bank} />
           </div>
 
           <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
@@ -399,7 +336,7 @@ export function FinanceiroPage() {
               {/* Filters */}
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                   <Input
                     placeholder="Buscar pagamentos..."
                     value={searchQuery}
@@ -438,7 +375,7 @@ export function FinanceiroPage() {
               </div>
 
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 className="text-lg font-semibold text-foreground">
                   Lista de Pagamentos
                 </h3>
                 <Button onClick={() => setPaymentModalOpen(true)}>
@@ -475,18 +412,18 @@ export function FinanceiroPage() {
                         return (
                           <TableRow key={payment.id}>
                             <TableCell>
-                              <div className="font-medium text-gray-900 dark:text-white">
+                              <div className="font-medium text-foreground">
                                 {payment.orderCode ? `Pedido #${payment.orderCode.replace(/^#/, '')}` : '-'}
                               </div>
                               {payment.transactionId && (
-                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                <div className="text-xs text-muted-foreground">
                                   ID: {payment.transactionId}
                                 </div>
                               )}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
-                                <PaymentIcon className="h-4 w-4 text-gray-400" />
+                                <PaymentIcon className="h-4 w-4 text-muted-foreground" />
                                 <span className="capitalize">
                                   {payment.method === 'credit_card' && 'Cartão de Crédito'}
                                   {payment.method === 'debit_card' && 'Cartão de Débito'}
@@ -495,17 +432,17 @@ export function FinanceiroPage() {
                                   {payment.method === 'transfer' && 'Transferência'}
                                 </span>
                               </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              <div className="text-xs text-muted-foreground mt-1">
                                 {payment.gateway === 'manual' ? 'Registro manual' : payment.gateway}
                               </div>
                             </TableCell>
                             <TableCell className="font-medium">
                               {formatCurrency(payment.amount)}
                             </TableCell>
-                            <TableCell className="text-red-600">
+                            <TableCell className="text-destructive">
                               -{formatCurrency(payment.fees)}
                             </TableCell>
-                            <TableCell className="font-semibold text-green-600">
+                            <TableCell className="font-semibold text-success">
                               {formatCurrency(payment.netAmount)}
                             </TableCell>
                             <TableCell>
@@ -525,7 +462,7 @@ export function FinanceiroPage() {
 
             <TabsContent value="payouts" className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 className="text-lg font-semibold text-foreground">
                   Histórico de Repasses
                 </h3>
                 <Button onClick={() => setPayoutModalOpen(true)}>
@@ -566,16 +503,16 @@ export function FinanceiroPage() {
                           <TableCell className="font-medium">
                             {formatCurrency(payout.amount)}
                           </TableCell>
-                          <TableCell className="text-red-600">
+                          <TableCell className="text-destructive">
                             -{formatCurrency(payout.fees)}
                           </TableCell>
-                          <TableCell className="font-semibold text-green-600">
+                          <TableCell className="font-semibold text-success">
                             {formatCurrency(payout.netAmount)}
                           </TableCell>
                           <TableCell>
                             <div className="text-sm">
                               <div>{payout.bankAccount.bank}</div>
-                              <div className="text-gray-500">
+                              <div className="text-muted-foreground">
                                 Ag: {payout.bankAccount.agency} / Conta: {payout.bankAccount.account}
                               </div>
                             </div>
@@ -602,7 +539,7 @@ export function FinanceiroPage() {
 
             <TabsContent value="bank-accounts" className="space-y-6">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 className="text-lg font-semibold text-foreground">
                   Contas Bancárias
                 </h3>
                 <Button onClick={() => setBankAccountModalOpen(true)}>
@@ -625,7 +562,7 @@ export function FinanceiroPage() {
                         <div className="space-y-4">
                           <div className="flex items-center gap-2">
                             <Bank className="h-5 w-5 text-primary" />
-                            <span className="font-semibold text-gray-900 dark:text-white">
+                            <span className="font-semibold text-foreground">
                               {account.bank}
                             </span>
                             {account.isDefault && (
@@ -637,15 +574,15 @@ export function FinanceiroPage() {
 
                           <div className="space-y-1 text-sm">
                             <div>
-                              <span className="text-gray-500">Agência:</span>{' '}
+                              <span className="text-muted-foreground">Agência:</span>{' '}
                               <span className="font-medium">{account.agency}</span>
                             </div>
                             <div>
-                              <span className="text-gray-500">Conta:</span>{' '}
+                              <span className="text-muted-foreground">Conta:</span>{' '}
                               <span className="font-medium">{account.account}</span>
                             </div>
                             <div>
-                              <span className="text-gray-500">Tipo:</span>{' '}
+                              <span className="text-muted-foreground">Tipo:</span>{' '}
                               <span className="font-medium">
                                 {account.accountType === 'checking' ? 'Corrente' : 'Poupança'}
                               </span>
@@ -654,7 +591,7 @@ export function FinanceiroPage() {
 
                           <div className="text-sm">
                             <div className="font-medium">{account.holderName}</div>
-                            <div className="text-gray-500">{account.holderDocument}</div>
+                            <div className="text-muted-foreground">{account.holderDocument}</div>
                           </div>
                         </div>
 
@@ -705,7 +642,7 @@ export function FinanceiroPage() {
                 <div className="space-y-2">
                   <Label htmlFor="payment-amount">Valor do Pagamento *</Label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                     <Input
                       id="payment-amount"
                       type="number"
@@ -783,7 +720,7 @@ export function FinanceiroPage() {
                 <div className="space-y-2">
                   <Label htmlFor="payout-amount">Valor do Repasse *</Label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                     <Input
                       id="payout-amount"
                       type="number"
@@ -795,7 +732,7 @@ export function FinanceiroPage() {
                       className="pl-10"
                     />
                   </div>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     Saldo disponível: {formatCurrency(financialStats?.availableForPayout || 0)}
                   </p>
                 </div>
@@ -819,7 +756,7 @@ export function FinanceiroPage() {
                             <Bank className="h-4 w-4" />
                             <div>
                               <div className="font-medium">{account.bank}</div>
-                              <div className="text-xs text-gray-500">
+                              <div className="text-xs text-muted-foreground">
                                 Ag: {account.agency} / Conta: {account.account}
                               </div>
                             </div>
@@ -830,14 +767,14 @@ export function FinanceiroPage() {
                   </Select>
                 </div>
 
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="bg-warning-muted border border-warning/30 rounded-lg p-4">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                    <AlertTriangle className="h-5 w-5 text-warning mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-yellow-800">
+                      <p className="text-sm font-medium text-warning">
                         Informações importantes
                       </p>
-                      <ul className="text-sm text-yellow-700 mt-1 space-y-1 list-disc list-inside">
+                      <ul className="text-sm text-warning mt-1 space-y-1 list-disc list-inside">
                         <li>A transferência é feita pela equipe NEOX após a solicitação (previsão: 1 dia útil)</li>
                         <li>Não há taxa de repasse</li>
                         <li>O valor não pode passar do saldo disponível</li>
@@ -955,7 +892,7 @@ export function FinanceiroPage() {
                     id="is-default"
                     checked={bankAccountData.isDefault}
                     onChange={(e) => setBankAccountData(prev => ({ ...prev, isDefault: e.target.checked }))}
-                    className="h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary"
+                    className="h-4 w-4 text-primary border-border rounded focus:ring-primary"
                   />
                   <Label htmlFor="is-default" className="text-sm">
                     Definir como conta padrão para repasses
@@ -977,7 +914,5 @@ export function FinanceiroPage() {
             </DialogContent>
           </Dialog>
         </div>
-      </AppShell>
-    </RoleGuard>
   );
 }

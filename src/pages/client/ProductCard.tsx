@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Eye, Package, ShoppingCart } from 'lucide-react';
+import { Loader2, Package, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { stockLevel } from '@/components/StatusBadge';
 import { formatCurrency } from '@/lib/utils';
 import type { CatalogProduct } from '@/services/CatalogService';
 
@@ -12,46 +11,65 @@ interface Props {
   adding?: boolean;
 }
 
+/**
+ * Card de produto. O card inteiro é clicável por um link "esticado" (after:inset-0) no nome,
+ * e o botão de adicionar fica acima dele — assim não há botão dentro de link.
+ */
 export function ProductCard({ product, onAdd, adding }: Props) {
   const hasDiscount = !!product.desconto && product.desconto > 0;
+  const out = stockLevel(product.estoque, product.minStock) === 'out';
   return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardContent className="p-0">
-        <Link to={`/produto/${product.id}`} className="relative block">
-          {product.imagem ? (
-            <img src={product.imagem} alt={product.nome} className="w-full h-48 object-cover rounded-t-lg" />
-          ) : (
-            <div className="w-full h-48 bg-gray-100 rounded-t-lg flex items-center justify-center">
-              <Package className="h-12 w-12 text-gray-400" />
-            </div>
-          )}
-          {hasDiscount && <Badge className="absolute top-2 left-2 bg-red-500">-{product.desconto}%</Badge>}
-        </Link>
-
-        <div className="p-4">
-          <Link to={`/lojas/${product.lojaId}`}>
-            <Badge variant="outline" className="text-xs mb-2">{product.lojaNome}</Badge>
+    <article className="group relative flex flex-col overflow-hidden rounded-lg border bg-card transition-shadow focus-within:ring-2 focus-within:ring-ring hover:shadow-md">
+      <div className="relative aspect-square bg-muted">
+        {product.imagem ? (
+          <img src={product.imagem} alt="" loading="lazy" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <Package className="h-10 w-10 text-muted-foreground" aria-hidden="true" />
+          </div>
+        )}
+        {hasDiscount && (
+          <span className="absolute left-2 top-2 rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-destructive-foreground">
+            -{product.desconto}%<span className="sr-only"> de desconto</span>
+          </span>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-1 p-3">
+        <p className="truncate text-xs text-muted-foreground">{product.lojaNome}</p>
+        <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-medium text-foreground">
+          <Link to={`/produto/${product.id}`} className="outline-none after:absolute after:inset-0 after:content-['']">
+            {product.nome}
           </Link>
-          <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{product.nome}</h3>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-lg font-bold text-green-600">{formatCurrency(product.precoFinal)}</span>
-            {hasDiscount && (
-              <span className="text-sm text-gray-500 line-through">{formatCurrency(product.preco)}</span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Button className="flex-1" onClick={() => onAdd(product)} disabled={adding || product.estoque === 0}>
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              {product.estoque === 0 ? 'Esgotado' : 'Adicionar'}
-            </Button>
-            <Link to={`/produto/${product.id}`}>
-              <Button variant="outline" size="icon" aria-label="Ver produto">
-                <Eye className="h-4 w-4" />
-              </Button>
-            </Link>
-          </div>
+        </h3>
+        <div className="mt-auto flex flex-wrap items-baseline gap-x-2">
+          <span className="font-semibold text-primary">{formatCurrency(product.precoFinal)}</span>
+          {hasDiscount && (
+            <span className="text-xs text-muted-foreground line-through">
+              <span className="sr-only">Preço anterior: </span>
+              {formatCurrency(product.preco)}
+            </span>
+          )}
         </div>
-      </CardContent>
-    </Card>
+        <Button
+          variant={out ? 'outline' : 'default'}
+          className="relative z-10 mt-2 w-full"
+          onClick={() => onAdd(product)}
+          disabled={adding || out}
+          aria-label={out ? `${product.nome}: esgotado` : `Adicionar ${product.nome} ao carrinho`}
+        >
+          {adding ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <ShoppingCart className="mr-2 h-4 w-4" aria-hidden="true" />
+          )}
+          {out ? 'Esgotado' : 'Adicionar'}
+        </Button>
+      </div>
+    </article>
   );
+}
+
+/** Grade padrão de produtos (2 colunas no celular). */
+export function ProductGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">{children}</div>;
 }

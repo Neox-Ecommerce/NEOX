@@ -1,121 +1,201 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import {
+  createBrowserRouter, createRoutesFromElements, Navigate, Outlet, Route, RouterProvider, useLocation, useParams,
+} from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { Toaster } from '@/components/ui/toaster';
 import { RoleGuard } from '@/components/RoleGuard';
+import { PageLoader } from '@/components/PageStates';
+import { StorefrontLayout } from '@/components/layouts/StorefrontLayout';
+import { PanelLayout } from '@/components/layouts/PanelLayout';
+import { AdminLayout } from '@/components/layouts/AdminLayout';
 
-// Lazy load components
-const Dashboard = React.lazy(() => import('@/pages/painel/dashboard').then(m => ({ default: m.Dashboard })));
-const ProductsPage = React.lazy(() => import('@/pages/products/index').then(m => ({ default: m.ProductsPage })));
-const ProductFormPage = React.lazy(() => import('@/pages/products/form').then(m => ({ default: m.ProductFormPage })));
-const EstoquePage = React.lazy(() => import('@/pages/painel/estoque').then(m => ({ default: m.EstoquePage })));
-const PedidosPage = React.lazy(() => import('@/pages/painel/pedidos').then(m => ({ default: m.PedidosPage })));
-const TrendsPage = React.lazy(() => import('@/pages/painel/trends').then(m => ({ default: m.TrendsPage })));
-const ClientesPage = React.lazy(() => import('@/pages/painel/clientes').then(m => ({ default: m.ClientesPage })));
-const MarketingPage = React.lazy(() => import('@/pages/painel/marketing').then(m => ({ default: m.MarketingPage })));
-const RelatoriosPage = React.lazy(() => import('@/pages/painel/relatorios').then(m => ({ default: m.RelatoriosPage })));
-const FinanceiroPage = React.lazy(() => import('@/pages/painel/financeiro').then(m => ({ default: m.FinanceiroPage })));
-const IntegracoesPage = React.lazy(() => import('@/pages/painel/integracoes').then(m => ({ default: m.IntegracoesPage })));
-const ConfiguracoesPage = React.lazy(() => import('@/pages/painel/configuracoes').then(m => ({ default: m.ConfiguracoesPage })));
-const AjudaPage = React.lazy(() => import('@/pages/painel/ajuda').then(m => ({ default: m.AjudaPage })));
-const ProfilePage = React.lazy(() => import('@/pages/profile').then(m => ({ default: m.ProfilePage })));
-const NotFoundPage = React.lazy(() => import('@/pages/errors/not-found').then(m => ({ default: m.NotFoundPage })));
-const UnauthorizedPage = React.lazy(() => import('@/pages/errors/unauthorized').then(m => ({ default: m.UnauthorizedPage })));
+const lazy = <T extends Record<string, React.ComponentType>>(load: () => Promise<T>, name: keyof T) =>
+  React.lazy(() => load().then((m) => ({ default: m[name] })));
 
-// Cliente pages
-const ClientHomePage = React.lazy(() => import('@/pages/client/home').then(m => ({ default: m.ClientHomePage })));
-const ClientDashboard = React.lazy(() => import('@/pages/client/dashboard').then(m => ({ default: m.ClientDashboard })));
-const StorePage = React.lazy(() => import('@/pages/client/store').then(m => ({ default: m.StorePage })));
-const ProductPage = React.lazy(() => import('@/pages/client/product').then(m => ({ default: m.ProductPage })));
-const CartPage = React.lazy(() => import('@/pages/client/cart').then(m => ({ default: m.CartPage })));
-const CheckoutReturnPage = React.lazy(() => import('@/pages/client/checkout-return').then(m => ({ default: m.CheckoutReturnPage })));
+// Loja (cliente)
+const StorefrontHomePage = lazy(() => import('@/pages/client/storefront'), 'StorefrontHomePage');
+const SearchPage = lazy(() => import('@/pages/client/search'), 'SearchPage');
+const StoresPage = lazy(() => import('@/pages/client/stores'), 'StoresPage');
+const StorePage = lazy(() => import('@/pages/client/store'), 'StorePage');
+const ProductPage = lazy(() => import('@/pages/client/product'), 'ProductPage');
+const CartPage = lazy(() => import('@/pages/client/cart'), 'CartPage');
+const CheckoutPage = lazy(() => import('@/pages/client/checkout'), 'CheckoutPage');
+const CheckoutReturnPage = lazy(() => import('@/pages/client/checkout-return'), 'CheckoutReturnPage');
+const AccountPage = lazy(() => import('@/pages/client/account'), 'AccountPage');
+const TermsPage = lazy(() => import('@/pages/client/legal'), 'TermsPage');
+const PrivacyPage = lazy(() => import('@/pages/client/legal'), 'PrivacyPage');
+const SellLandingPage = lazy(() => import('@/pages/client/home'), 'ClientHomePage');
 
-// Auth pages
-const AuthPage = React.lazy(() => import('@/pages/auth').then(m => ({ default: m.AuthPage })));
+// Acesso
+const AuthPage = lazy(() => import('@/pages/auth'), 'AuthPage');
+const ForgotPasswordPage = lazy(() => import('@/pages/auth/password'), 'ForgotPasswordPage');
+const ResetPasswordPage = lazy(() => import('@/pages/auth/password'), 'ResetPasswordPage');
+const SellerSignupPage = lazy(() => import('@/pages/auth/components/EntrepreneurRegistration'), 'EntrepreneurRegistration');
 
-// Admin pages
-const AdminStoresPage = React.lazy(() => import('@/pages/admin/stores').then(m => ({ default: m.AdminStoresPage })));
-const AdminLoginPage = React.lazy(() => import('@/pages/admin/login').then(m => ({ default: m.AdminLoginPage })));
-const AdminVideosPage = React.lazy(() => import('@/pages/admin/videos').then(m => ({ default: m.AdminVideosPage })));
+// Painel do lojista
+const Dashboard = lazy(() => import('@/pages/painel/dashboard'), 'Dashboard');
+const ProductsPage = lazy(() => import('@/pages/products/index'), 'ProductsPage');
+const ProductFormPage = lazy(() => import('@/pages/products/form'), 'ProductFormPage');
+const EstoquePage = lazy(() => import('@/pages/painel/estoque'), 'EstoquePage');
+const PedidosPage = lazy(() => import('@/pages/painel/pedidos'), 'PedidosPage');
+const TrendsPage = lazy(() => import('@/pages/painel/trends'), 'TrendsPage');
+const ClientesPage = lazy(() => import('@/pages/painel/clientes'), 'ClientesPage');
+const MarketingPage = lazy(() => import('@/pages/painel/marketing'), 'MarketingPage');
+const RelatoriosPage = lazy(() => import('@/pages/painel/relatorios'), 'RelatoriosPage');
+const FinanceiroPage = lazy(() => import('@/pages/painel/financeiro'), 'FinanceiroPage');
+const AjudaPage = lazy(() => import('@/pages/painel/ajuda'), 'AjudaPage');
+const MyStorePage = lazy(() => import('@/pages/painel/loja'), 'MyStorePage');
+const MyAccountPage = lazy(() => import('@/pages/painel/conta'), 'MyAccountPage');
+
+// Admin
+const AdminLoginPage = lazy(() => import('@/pages/admin/login'), 'AdminLoginPage');
+const AdminOverviewPage = lazy(() => import('@/pages/admin/overview'), 'AdminOverviewPage');
+const AdminStoresPage = lazy(() => import('@/pages/admin/stores'), 'AdminStoresPage');
+const AdminStoreDetailPage = lazy(() => import('@/pages/admin/store-detail'), 'AdminStoreDetailPage');
+const AdminVideosPage = lazy(() => import('@/pages/admin/videos'), 'AdminVideosPage');
+const AdminPayoutsPage = lazy(() => import('@/pages/admin/payouts'), 'AdminPayoutsPage');
+const AdminSupportPage = lazy(() => import('@/pages/admin/support'), 'AdminSupportPage');
+const AdminUsersPage = lazy(() => import('@/pages/admin/users'), 'AdminUsersPage');
+const AdminSettingsPage = lazy(() => import('@/pages/admin/settings'), 'AdminSettingsPage');
+
+// Erros
+const NotFoundPage = lazy(() => import('@/pages/errors/not-found'), 'NotFoundPage');
+const UnauthorizedPage = lazy(() => import('@/pages/errors/unauthorized'), 'UnauthorizedPage');
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes
+      staleTime: 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: 1,
     },
   },
 });
+
+/** Redirect que preserva a query string (ex.: /auth?next=… → /entrar?next=…). */
+function KeepQuery({ to }: { to: string }) {
+  const { search } = useLocation();
+  return <Navigate to={to + search} replace />;
+}
+
+/** Redirect de rota antiga que preserva o :id. */
+function LegacyProductEdit() {
+  const { id } = useParams();
+  return <Navigate to={`/painel/produtos/editar/${id}`} replace />;
+}
+
+const guard = (role: 'CLIENTE' | 'EMPREENDEDOR' | 'ADMIN') => (
+  <RoleGuard requiredRole={role}>
+    <Outlet />
+  </RoleGuard>
+);
+
+/** Raiz das rotas: tudo que precisa estar dentro do roteador. */
+function RootLayout() {
+  return (
+    <>
+      <LoadingOverlay />
+      <Suspense fallback={<PageLoader />}>
+        <Outlet />
+      </Suspense>
+      <Toaster />
+    </>
+  );
+}
+
+// Roteador de dados (createBrowserRouter): necessário para useBlocker (aviso de alterações não salvas).
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<RootLayout />}>
+              {/* Loja pública e área do cliente */}
+              <Route element={<StorefrontLayout />}>
+                <Route path="/" element={<StorefrontHomePage />} />
+                <Route path="/buscar" element={<SearchPage />} />
+                <Route path="/lojas" element={<StoresPage />} />
+                <Route path="/lojas/:id" element={<StorePage />} />
+                <Route path="/produto/:id" element={<ProductPage />} />
+                <Route path="/carrinho" element={<CartPage />} />
+                <Route path="/termos" element={<TermsPage />} />
+                <Route path="/privacidade" element={<PrivacyPage />} />
+                <Route element={guard('CLIENTE')}>
+                  <Route path="/checkout" element={<CheckoutPage />} />
+                  <Route path="/checkout/retorno" element={<CheckoutReturnPage />} />
+                  <Route path="/conta/*" element={<AccountPage />} />
+                </Route>
+              </Route>
+
+              {/* Acesso e página de vendas para lojistas (layout próprio) */}
+              <Route path="/entrar" element={<AuthPage />} />
+              <Route path="/recuperar-senha" element={<ForgotPasswordPage />} />
+              <Route path="/redefinir-senha" element={<ResetPasswordPage />} />
+              <Route path="/vender" element={<SellLandingPage />} />
+              <Route path="/vender/cadastro" element={<SellerSignupPage />} />
+
+              {/* Painel do lojista */}
+              <Route path="/painel" element={guard('EMPREENDEDOR')}>
+                <Route element={<PanelLayout />}>
+                  <Route index element={<Navigate to="/painel/dashboard" replace />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="pedidos" element={<PedidosPage />} />
+                  <Route path="clientes" element={<ClientesPage />} />
+                  <Route path="produtos" element={<ProductsPage />} />
+                  <Route path="produtos/novo" element={<ProductFormPage />} />
+                  <Route path="produtos/editar/:id" element={<ProductFormPage />} />
+                  <Route path="estoque" element={<EstoquePage />} />
+                  <Route path="marketing" element={<MarketingPage />} />
+                  <Route path="trends" element={<TrendsPage />} />
+                  <Route path="financeiro/*" element={<FinanceiroPage />} />
+                  <Route path="relatorios" element={<RelatoriosPage />} />
+                  <Route path="loja/*" element={<MyStorePage />} />
+                  <Route path="conta" element={<MyAccountPage />} />
+                  <Route path="ajuda" element={<AjudaPage />} />
+                  {/* rotas antigas */}
+                  <Route path="perfil" element={<Navigate to="/painel/conta" replace />} />
+                  <Route path="configuracoes" element={<Navigate to="/painel/loja" replace />} />
+                  <Route path="integracoes" element={<Navigate to="/painel/loja/integracoes" replace />} />
+                </Route>
+              </Route>
+
+              {/* Admin */}
+              <Route path="/admin/login" element={<AdminLoginPage />} />
+              <Route path="/admin" element={guard('ADMIN')}>
+                <Route element={<AdminLayout />}>
+                  <Route index element={<AdminOverviewPage />} />
+                  <Route path="lojas" element={<AdminStoresPage />} />
+                  <Route path="lojas/:id" element={<AdminStoreDetailPage />} />
+                  <Route path="videos" element={<AdminVideosPage />} />
+                  <Route path="repasses" element={<AdminPayoutsPage />} />
+                  <Route path="suporte" element={<AdminSupportPage />} />
+                  <Route path="usuarios" element={<AdminUsersPage />} />
+                  <Route path="configuracoes" element={<AdminSettingsPage />} />
+                </Route>
+              </Route>
+
+              {/* Rotas antigas */}
+              <Route path="/auth" element={<KeepQuery to="/entrar" />} />
+              <Route path="/login" element={<KeepQuery to="/entrar" />} />
+              <Route path="/register" element={<Navigate to="/entrar?aba=cadastro" replace />} />
+              <Route path="/cliente" element={<Navigate to="/conta/pedidos" replace />} />
+              <Route path="/dashboard" element={<Navigate to="/painel/dashboard" replace />} />
+              <Route path="/products" element={<Navigate to="/painel/produtos" replace />} />
+              <Route path="/products/new" element={<Navigate to="/painel/produtos/novo" replace />} />
+              <Route path="/products/edit/:id" element={<LegacyProductEdit />} />
+              <Route path="/profile" element={<Navigate to="/painel/conta" replace />} />
+
+              <Route path="/unauthorized" element={<UnauthorizedPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+    </Route>,
+  ),
+);
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router>
-          <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            <LoadingOverlay />
-            <Suspense fallback={
-              <div className="flex items-center justify-center min-h-screen">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            }>
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/auth" element={<AuthPage />} />
-                <Route path="/unauthorized" element={<UnauthorizedPage />} />
-                
-                {/* Client Routes */}
-                <Route path="/" element={<ClientHomePage />} />
-                <Route path="/cliente" element={<RoleGuard requiredRole="CLIENTE"><ClientDashboard /></RoleGuard>} />
-                <Route path="/lojas/:id" element={<StorePage />} />
-                <Route path="/produto/:id" element={<ProductPage />} />
-                <Route path="/carrinho" element={<RoleGuard requiredRole="CLIENTE"><CartPage /></RoleGuard>} />
-                <Route path="/checkout/retorno" element={<RoleGuard requiredRole="CLIENTE"><CheckoutReturnPage /></RoleGuard>} />
-                
-                {/* Painel do Empreendedor */}
-                <Route path="/painel" element={<Navigate to="/painel/dashboard" replace />} />
-                <Route path="/painel/dashboard" element={<Dashboard />} />
-                <Route path="/painel/produtos" element={<ProductsPage />} />
-                <Route path="/painel/produtos/novo" element={<ProductFormPage />} />
-                <Route path="/painel/produtos/editar/:id" element={<ProductFormPage />} />
-                <Route path="/painel/estoque" element={<EstoquePage />} />
-                <Route path="/painel/pedidos" element={<PedidosPage />} />
-                <Route path="/painel/trends" element={<TrendsPage />} />
-                <Route path="/painel/clientes" element={<ClientesPage />} />
-                <Route path="/painel/marketing" element={<MarketingPage />} />
-                <Route path="/painel/relatorios" element={<RelatoriosPage />} />
-                <Route path="/painel/financeiro" element={<FinanceiroPage />} />
-                <Route path="/painel/financeiro/pagamentos" element={<FinanceiroPage />} />
-                <Route path="/painel/financeiro/repasses" element={<FinanceiroPage />} />
-                <Route path="/painel/integracoes" element={<IntegracoesPage />} />
-                <Route path="/painel/configuracoes" element={<ConfiguracoesPage />} />
-                <Route path="/painel/ajuda" element={<AjudaPage />} />
-                <Route path="/painel/perfil" element={<ProfilePage />} />
-                
-                {/* Admin Routes */}
-                <Route path="/admin" element={<Navigate to="/admin/lojas" replace />} />
-                <Route path="/admin/lojas" element={<AdminStoresPage />} />
-                <Route path="/admin/videos" element={<AdminVideosPage />} />
-                <Route path="/admin/login" element={<AdminLoginPage />} />
-                
-                {/* Legacy redirects */}
-                <Route path="/login" element={<Navigate to="/auth" replace />} />
-                <Route path="/register" element={<Navigate to="/auth" replace />} />
-                <Route path="/dashboard" element={<Navigate to="/painel/dashboard" replace />} />
-                <Route path="/products" element={<Navigate to="/painel/produtos" replace />} />
-                <Route path="/products/new" element={<Navigate to="/painel/produtos/novo" replace />} />
-                <Route path="/products/edit/:id" element={<Navigate to="/painel/produtos/editar/:id" replace />} />
-                <Route path="/profile" element={<Navigate to="/painel/perfil" replace />} />
-                
-                {/* Catch all - 404 */}
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            </Suspense>
-            <Toaster />
-          </div>
-        </Router>
+        <RouterProvider router={router} />
       </AuthProvider>
     </QueryClientProvider>
   );

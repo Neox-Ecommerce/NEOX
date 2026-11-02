@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Logo } from '@/components/layouts/shared';
 import { PersonalDataStep } from './registration/PersonalDataStep';
 import { StoreDataStep } from './registration/StoreDataStep';
 import { VerificationStep } from './registration/VerificationStep';
 import { RegistrationSuccess } from './registration/RegistrationSuccess';
-import { ArrowLeft, CheckCircle, Rocket } from 'lucide-react';
+import { ArrowLeft, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { FeedbackService } from '@/services/FeedbackService';
 
@@ -36,7 +37,6 @@ export interface RegistrationData {
 
 export function EntrepreneurRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
-  const navigate = useNavigate();
   const { registerStore } = useAuth();
   const [registrationData, setRegistrationData] = useState<RegistrationData>({
     personal: {
@@ -102,10 +102,6 @@ export function EntrepreneurRegistration() {
     }
   };
 
-  const handleBackToAuth = () => {
-    navigate('/auth');
-  };
-
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 1:
@@ -143,97 +139,45 @@ export function EntrepreneurRegistration() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 relative overflow-hidden">
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-green-600 to-green-700 text-white py-3 px-4 relative z-20">
-        <div className="max-w-6xl mx-auto flex items-center justify-center space-x-2">
-          <Rocket className="w-5 h-5" />
-          <span className="text-sm font-medium">
-            🚀 Comece com segurança! Empreendedores verificados geram mais vendas.
-          </span>
+    <div className="min-h-screen bg-muted/40">
+      <header className="border-b bg-card">
+        <div className="mx-auto flex h-16 max-w-4xl items-center px-4 sm:px-6">
+          <Logo to="/vender" />
         </div>
-      </div>
+      </header>
+      <main className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6">
+        <Link to="/vender" className="mb-6 inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Voltar para Venda na NEOX
+        </Link>
 
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-40 left-40 w-80 h-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-4 relative z-10">
-        <div className="w-full max-w-4xl mx-auto">
-          {/* Back to Auth Button - Hero Position */}
-          <div className="mb-8">
-            <button
-              onClick={handleBackToAuth}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors group"
-            >
-              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-200" />
-              <span className="font-medium">Voltar ao Login</span>
-            </button>
-          </div>
-
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Cadastro de Empreendedor
-            </h1>
-            <p className="text-gray-600">
-              Configure sua loja digital em poucos passos
-            </p>
-          </div>
-
-          {/* Progress Steps */}
-          <div className="flex items-center justify-center mb-8">
-            <div className="flex items-center space-x-4">
-              {steps.map((step, index) => (
-                <React.Fragment key={step.number}>
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 ${
-                        currentStep >= step.number
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-200 text-gray-600'
-                      }`}
-                    >
-                      {currentStep > step.number ? (
-                        <CheckCircle className="w-5 h-5" />
-                      ) : (
-                        step.number
-                      )}
-                    </div>
-                    <div className="mt-2 text-center">
-                      <div className={`text-sm font-medium ${
-                        currentStep >= step.number ? 'text-green-600' : 'text-gray-600'
-                      }`}>
-                        {step.title}
-                      </div>
-                      <div className="text-xs text-gray-500 hidden sm:block">
-                        {step.description}
-                      </div>
-                    </div>
-                  </div>
-                  {index < steps.length - 1 && (
-                    <div
-                      className={`w-16 h-0.5 transition-all duration-300 ${
-                        currentStep > step.number ? 'bg-green-600' : 'bg-gray-200'
-                      }`}
-                    />
-                  )}
-                </React.Fragment>
-              ))}
-            </div>
-          </div>
-
-          {/* Main Content Card */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 backdrop-blur-sm border border-white/20">
-            {/* Step Content */}
-            {renderCurrentStep()}
-          </div>
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-semibold tracking-tight">Cadastro de lojista</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Configure sua loja em poucos passos. Já tem conta? <Link to="/entrar" className="font-medium text-primary hover:underline">Entrar</Link></p>
         </div>
-      </div>
+
+        <ol className="mb-6 flex items-start justify-center gap-2 sm:gap-4" aria-label="Etapas do cadastro">
+          {steps.map((step, index) => {
+            const done = currentStep > step.number;
+            const on = currentStep >= step.number;
+            return (
+              <li key={step.number} className="flex items-start gap-2 sm:gap-4" aria-current={currentStep === step.number ? 'step' : undefined}>
+                <div className="flex flex-col items-center text-center">
+                  <span className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold ${on ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                    {done ? <CheckCircle className="h-5 w-5" aria-label="Concluída" /> : step.number}
+                  </span>
+                  <span className={`mt-2 text-xs font-medium sm:text-sm ${on ? 'text-primary' : 'text-muted-foreground'}`}>{step.title}</span>
+                  <span className="hidden text-xs text-muted-foreground sm:block">{step.description}</span>
+                </div>
+                {index < steps.length - 1 && (
+                  <span aria-hidden="true" className={`mt-5 h-0.5 w-6 sm:w-16 ${done ? 'bg-primary' : 'bg-border'}`} />
+                )}
+              </li>
+            );
+          })}
+        </ol>
+
+        <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-8">{renderCurrentStep()}</div>
+      </main>
     </div>
   );
 }

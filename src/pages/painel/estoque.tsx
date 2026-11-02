@@ -1,581 +1,346 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  Package, 
-  AlertTriangle, 
-  TrendingDown, 
-  Search, 
-  Filter,
-  Download,
-  Plus,
-  Minus,
-  Edit,
-  BarChart3,
-  Eye,
-  RefreshCw,
-  FileText,
-  Calendar,
-  ArrowUpRight,
-  ArrowDownRight
-} from 'lucide-react';
-import { AppShell } from '@/components/AppShell';
-import { RoleGuard } from '@/components/RoleGuard';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, BarChart3, Download, Eye, Package, PackageX, RefreshCw, Search, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { InventoryService, InventoryItem } from '@/services/InventoryService';
+import { EmptyState, IconButton, PageHeader, QueryState } from '@/components/PageStates';
+import { MetricCard } from '@/components/MetricCard';
+import { StatusBadge, stockLevel } from '@/components/StatusBadge';
+import { InventoryService, type InventoryItem, type InventoryMovement } from '@/services/InventoryService';
 import { FeedbackService } from '@/services/FeedbackService';
-import { useAuth } from '@/contexts/AuthContext';
-import { formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
+
+const level = (i: InventoryItem) => stockLevel(i.currentStock, i.minStock);
+
+function downloadCsv(items: InventoryItem[]) {
+  const url = URL.createObjectURL(InventoryService.exportInventory(items));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `estoque-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function MovementList({ movements }: { movements: InventoryMovement[] }) {
+  return (
+    <ul className="divide-y">
+      {movements.map((m) => (
+        <li key={m.id} className="flex items-center gap-3 py-3">
+          <div className={cn('rounded-full p-2', m.type === 'in' ? 'bg-success-muted text-success' : 'bg-destructive-muted text-destructive')}>
+            {m.type === 'in' ? <ArrowUpRight className="h-4 w-4" aria-hidden="true" /> : <ArrowDownRight className="h-4 w-4" aria-hidden="true" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">{m.productName}</p>
+            <p className="text-sm text-muted-foreground">{m.reason}</p>
+          </div>
+          <div className="text-right">
+            <p className={cn('font-semibold', m.type === 'in' ? 'text-success' : 'text-destructive')}>
+              <span className="sr-only">{m.type === 'in' ? 'Entrada de' : 'Saída de'} </span>{m.type === 'in' ? '+' : '−'}{m.quantity}
+            </p>
+            <p className="text-xs text-muted-foreground">{m.date}</p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function EstoquePage() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedProduct, setSelectedProduct] = useState<InventoryItem | null>(null);
-  const [adjustmentModalOpen, setAdjustmentModalOpen] = useState(false);
-  const [adjustmentData, setAdjustmentData] = useState({
-    type: 'add' as 'add' | 'remove',
-    quantity: '',
-    reason: '',
-    cost: ''
-  });
-
-  const { user } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const filtro = params.get('filtro') ?? 'all';
+  const tab = params.get('aba') === 'movimentacoes' ? 'movimentacoes' : 'estoque';
+  const [search, setSearch] = useState('');
+  const [adjusting, setAdjusting] = useState<InventoryItem | null>(null);
+  const [adjust, setAdjust] = useState({ type: 'add' as 'add' | 'remove', quantity: '', reason: '', cost: '' });
+  const [viewing, setViewing] = useState<InventoryItem | null>(null);
+  const [minStock, setMinStock] = useState('');
   const queryClient = useQueryClient();
 
-  const { data: inventory = [], isLoading } = useQuery({
-    queryKey: ['inventory', user?.lojaId],
-    queryFn: () => InventoryService.getInventory()
-  });
+  const inventoryQuery = useQuery({ queryKey: ['inventory'], queryFn: InventoryService.getInventory });
+  const movementsQuery = useQuery({ queryKey: ['inventory-movements'], queryFn: () => InventoryService.getMovements() });
 
-  const { data: movements = [] } = useQuery({
-    queryKey: ['inventory-movements', user?.lojaId],
-    queryFn: () => InventoryService.getMovements()
-  });
-
-  const { data: alerts = [] } = useQuery({
-    queryKey: ['inventory-alerts', user?.lojaId],
-    queryFn: () => InventoryService.getAlerts()
-  });
-
-  const adjustInventoryMutation = useMutation({
-    mutationFn: InventoryService.adjustInventory,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory-alerts'] });
-      FeedbackService.success('Estoque ajustado com sucesso!');
-      setAdjustmentModalOpen(false);
-      setSelectedProduct(null);
-      setAdjustmentData({ type: 'add', quantity: '', reason: '', cost: '' });
-    },
-    onError: (error: Error) => {
-      FeedbackService.error(error.message || 'Erro ao ajustar estoque');
-    }
-  });
-
-  const handleAdjustment = (product: InventoryItem) => {
-    setSelectedProduct(product);
-    setAdjustmentModalOpen(true);
+  const setParam = (key: string, value: string | null) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value); else next.delete(key);
+    setParams(next, { replace: true });
   };
 
-  const handleSubmitAdjustment = () => {
-    if (!selectedProduct || !adjustmentData.quantity || !adjustmentData.reason) {
-      FeedbackService.error('Preencha todos os campos obrigatórios');
-      return;
-    }
+  const refreshAll = () => ['inventory', 'inventory-movements', 'inventory-alerts', 'products', 'product-stats', 'dashboard-overview']
+    .forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
 
-    adjustInventoryMutation.mutate({
-      productId: selectedProduct.id,
-      type: adjustmentData.type,
-      quantity: parseInt(adjustmentData.quantity),
-      reason: adjustmentData.reason,
-      cost: adjustmentData.cost ? parseFloat(adjustmentData.cost) : undefined
+  const adjustMutation = useMutation({
+    mutationFn: InventoryService.adjustInventory,
+    onSuccess: () => {
+      refreshAll();
+      FeedbackService.success('Estoque ajustado.');
+      setAdjusting(null);
+    },
+    onError: (e: Error) => FeedbackService.error(e.message || 'Não foi possível ajustar o estoque.'),
+  });
+
+  const minStockMutation = useMutation({
+    mutationFn: ({ id, value }: { id: string; value: number }) => InventoryService.updateMinStock(id, value),
+    onSuccess: (_, { value }) => {
+      refreshAll();
+      FeedbackService.success('Estoque mínimo atualizado.');
+      setViewing((v) => (v ? { ...v, minStock: value } : v));
+    },
+    onError: (e: Error) => FeedbackService.error(e.message || 'Não foi possível salvar o estoque mínimo.'),
+  });
+
+  const openAdjust = (item: InventoryItem) => {
+    setAdjusting(item);
+    setAdjust({ type: 'add', quantity: '', reason: '', cost: '' });
+  };
+
+  const openDetail = (item: InventoryItem) => {
+    setViewing(item);
+    setMinStock(String(item.minStock));
+  };
+
+  const submitAdjust = () => {
+    const quantity = parseInt(adjust.quantity, 10);
+    if (!adjusting || !quantity || quantity < 1 || !adjust.reason.trim()) {
+      return FeedbackService.error('Informe a quantidade (1 ou mais) e o motivo.');
+    }
+    adjustMutation.mutate({
+      productId: adjusting.productId,
+      type: adjust.type,
+      quantity,
+      reason: adjust.reason.trim(),
+      cost: adjust.cost ? parseFloat(adjust.cost) : undefined,
     });
   };
 
-  const filteredInventory = inventory.filter(item => {
-    const matchesSearch = searchQuery === '' || 
-      item.productName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.sku?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || 
-      (statusFilter === 'low' && item.currentStock <= item.minStock) ||
-      (statusFilter === 'out' && item.currentStock === 0) ||
-      (statusFilter === 'normal' && item.currentStock > item.minStock);
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  const getStockStatus = (item: InventoryItem) => {
-    if (item.currentStock === 0) return { label: 'Esgotado', variant: 'destructive' as const };
-    if (item.currentStock <= item.minStock) return { label: 'Estoque Baixo', variant: 'warning' as const };
-    return { label: 'Normal', variant: 'success' as const };
+  const filter = (items: InventoryItem[]) => {
+    const q = search.trim().toLowerCase();
+    return items.filter((i) =>
+      (!q || i.productName.toLowerCase().includes(q) || i.sku?.toLowerCase().includes(q)) &&
+      (filtro === 'all' ||
+        (filtro === 'baixo' && level(i) !== 'ok') ||
+        (filtro === 'esgotado' && level(i) === 'out') ||
+        (filtro === 'normal' && level(i) === 'ok')));
   };
 
-  const getTotalValue = () => {
-    return inventory.reduce((total, item) => total + (item.currentStock * item.averageCost), 0);
-  };
-
-  const getLowStockCount = () => {
-    return inventory.filter(item => item.currentStock <= item.minStock && item.currentStock > 0).length;
-  };
-
-  const getOutOfStockCount = () => {
-    return inventory.filter(item => item.currentStock === 0).length;
-  };
-
-  if (isLoading) {
-    return (
-      <RoleGuard requiredRole="EMPREENDEDOR">
-        <AppShell>
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </AppShell>
-      </RoleGuard>
-    );
-  }
+  const items = inventoryQuery.data ?? [];
 
   return (
-    <RoleGuard requiredRole="EMPREENDEDOR">
-      <AppShell>
-        <div className="p-6 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Controle de Estoque
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Gerencie o estoque dos seus produtos
-              </p>
+    <div>
+      <PageHeader
+        title="Estoque"
+        description="Quantidades, reposição e histórico de movimentações."
+        actions={
+          <>
+            <Button variant="outline" onClick={() => downloadCsv(filter(items))} disabled={!items.length}>
+              <Download className="mr-2 h-4 w-4" aria-hidden="true" /> Exportar CSV
+            </Button>
+            <Button variant="outline" onClick={refreshAll}>
+              <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" /> Atualizar
+            </Button>
+          </>
+        }
+      />
+
+      {inventoryQuery.data && (
+        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <MetricCard title="Produtos" value={items.length} icon={Package} />
+          <MetricCard title="Valor em estoque (custo)" value={items.reduce((t, i) => t + i.currentStock * i.averageCost, 0)} format="currency" icon={BarChart3} tone="success" />
+          <MetricCard title="Estoque baixo" value={items.filter((i) => level(i) === 'low').length} icon={AlertTriangle} tone="warning" />
+          <MetricCard title="Esgotados" value={items.filter((i) => level(i) === 'out').length} icon={PackageX} tone="destructive" />
+        </div>
+      )}
+
+      <Tabs value={tab} onValueChange={(v) => setParam('aba', v === 'movimentacoes' ? v : null)} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="estoque">Estoque atual</TabsTrigger>
+          <TabsTrigger value="movimentacoes">Movimentações</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="estoque" className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative flex-1 sm:max-w-md">
+              <Label htmlFor="busca-estoque" className="sr-only">Buscar no estoque</Label>
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input id="busca-estoque" placeholder="Nome ou SKU" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
             </div>
-            
-            <div className="flex items-center gap-3">
-              <Button variant="outline" onClick={() => {
-                const url = URL.createObjectURL(InventoryService.exportInventory(filteredInventory));
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `estoque-${new Date().toISOString().split('T')[0]}.csv`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}>
-                <Download className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
-              <Button onClick={() => {
-                queryClient.invalidateQueries({ queryKey: ['inventory'] });
-                queryClient.invalidateQueries({ queryKey: ['inventory-movements'] });
-                queryClient.invalidateQueries({ queryKey: ['inventory-alerts'] });
-              }}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Atualizar
-              </Button>
-            </div>
+            <Select value={filtro} onValueChange={(v) => setParam('filtro', v === 'all' ? null : v)}>
+              <SelectTrigger className="sm:w-56" aria-label="Filtrar por situação do estoque"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="baixo">Precisa repor (baixo ou esgotado)</SelectItem>
+                <SelectItem value="esgotado">Esgotados</SelectItem>
+                <SelectItem value="normal">Em estoque</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total de Produtos</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {inventory.length}
-                    </p>
-                  </div>
-                  <Package className="h-8 w-8 text-blue-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Valor Total</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {formatCurrency(getTotalValue())}
-                    </p>
-                  </div>
-                  <BarChart3 className="h-8 w-8 text-green-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Estoque Baixo</p>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {getLowStockCount()}
-                    </p>
-                  </div>
-                  <AlertTriangle className="h-8 w-8 text-yellow-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Esgotados</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {getOutOfStockCount()}
-                    </p>
-                  </div>
-                  <TrendingDown className="h-8 w-8 text-red-600" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Alerts */}
-          {alerts.length > 0 && (
-            <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
-                  <AlertTriangle className="h-5 w-5" />
-                  Alertas de Estoque
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {alerts.map((alert, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">{alert.productName}</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{alert.message}</p>
-                      </div>
-                      <Badge variant={alert.type === 'critical' ? 'destructive' : 'warning'}>
-                        {alert.type === 'critical' ? 'Crítico' : 'Atenção'}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Tabs defaultValue="inventory" className="space-y-6">
-            <TabsList>
-              <TabsTrigger value="inventory">Estoque Atual</TabsTrigger>
-              <TabsTrigger value="movements">Movimentações</TabsTrigger>
-              <TabsTrigger value="reports">Relatórios</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="inventory" className="space-y-6">
-              {/* Filters */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input
-                    placeholder="Buscar produtos..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-48">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="normal">Estoque Normal</SelectItem>
-                    <SelectItem value="low">Estoque Baixo</SelectItem>
-                    <SelectItem value="out">Esgotado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Inventory Table */}
+          <QueryState
+            query={inventoryQuery}
+            isEmpty={(d) => d.length === 0}
+            empty={
               <Card>
-                <CardContent className="p-0">
+                <EmptyState icon={Package} title="Nenhum produto no estoque" description="Cadastre produtos para controlar o estoque."
+                  action={<Button asChild><Link to="/painel/produtos/novo">Cadastrar produto</Link></Button>} />
+              </Card>
+            }
+          >
+            {(all) => {
+              const list = filter(all);
+              if (!list.length) {
+                return (
+                  <Card>
+                    <EmptyState icon={Search} title={filtro === 'baixo' ? 'Nenhum produto precisa de reposição' : 'Nenhum produto com esses filtros'}
+                      action={<Button variant="outline" onClick={() => { setSearch(''); setParam('filtro', null); }}>Ver todo o estoque</Button>} />
+                  </Card>
+                );
+              }
+              return (
+                <Card className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Produto</TableHead>
-                        <TableHead>SKU</TableHead>
-                        <TableHead>Estoque Atual</TableHead>
-                        <TableHead>Estoque Mínimo</TableHead>
-                        <TableHead>Custo Médio</TableHead>
-                        <TableHead>Valor Total</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Atual</TableHead>
+                        <TableHead className="hidden text-right sm:table-cell">Mínimo</TableHead>
+                        <TableHead className="hidden text-right md:table-cell">Custo médio</TableHead>
+                        <TableHead>Situação</TableHead>
                         <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredInventory.map((item) => {
-                        const status = getStockStatus(item);
-                        return (
-                          <TableRow key={item.id}>
-                            <TableCell>
-                              <div className="flex items-center space-x-3">
-                                <div className="h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-                                  <Package className="h-5 w-5 text-gray-400" />
-                                </div>
-                                <div>
-                                  <div className="font-medium text-gray-900 dark:text-white">
-                                    {item.productName}
-                                  </div>
-                                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                                    {item.category}
-                                  </div>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">
-                              {item.sku || '-'}
-                            </TableCell>
-                            <TableCell>
-                              <span className={`font-semibold ${
-                                item.currentStock === 0 ? 'text-red-600' :
-                                item.currentStock <= item.minStock ? 'text-yellow-600' :
-                                'text-green-600'
-                              }`}>
-                                {item.currentStock}
-                              </span>
-                            </TableCell>
-                            <TableCell>{item.minStock}</TableCell>
-                            <TableCell>{formatCurrency(item.averageCost)}</TableCell>
-                            <TableCell className="font-semibold">
-                              {formatCurrency(item.currentStock * item.averageCost)}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={status.variant}>
-                                {status.label}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end space-x-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleAdjustment(item)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon">
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {list.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            <p className="font-medium">{item.productName}</p>
+                            <p className="text-xs text-muted-foreground">{item.sku ? `SKU ${item.sku} · ` : ''}{item.category}</p>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">{item.currentStock}</TableCell>
+                          <TableCell className="hidden text-right sm:table-cell">{item.minStock}</TableCell>
+                          <TableCell className="hidden text-right md:table-cell">{formatCurrency(item.averageCost)}</TableCell>
+                          <TableCell><StatusBadge kind="stock" value={level(item)} /></TableCell>
+                          <TableCell>
+                            <div className="flex justify-end gap-1">
+                              <IconButton label={`Ajustar estoque de ${item.productName}`} icon={SlidersHorizontal} onClick={() => openAdjust(item)} />
+                              <IconButton label={`Ver detalhes de ${item.productName}`} icon={Eye} onClick={() => openDetail(item)} />
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="movements" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Movimentações Recentes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {movements.map((movement) => (
-                      <div key={movement.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex items-center space-x-4">
-                          <div className={`p-2 rounded-full ${
-                            movement.type === 'in' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
-                          }`}>
-                            {movement.type === 'in' ? (
-                              <ArrowUpRight className="h-4 w-4" />
-                            ) : (
-                              <ArrowDownRight className="h-4 w-4" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900 dark:text-white">
-                              {movement.productName}
-                            </p>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">
-                              {movement.reason}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className={`font-semibold ${
-                            movement.type === 'in' ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {movement.type === 'in' ? '+' : '-'}{movement.quantity}
-                          </p>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {movement.date}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="reports" className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Relatório de Estoque
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">
-                      Gere relatórios detalhados do seu estoque
-                    </p>
-                    <Button className="w-full">
-                      <Download className="h-4 w-4 mr-2" />
-                      Gerar Relatório
-                    </Button>
-                  </CardContent>
                 </Card>
+              );
+            }}
+          </QueryState>
+        </TabsContent>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5" />
-                      Histórico de Movimentações
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">
-                      Visualize o histórico completo de movimentações
-                    </p>
-                    <Button className="w-full" variant="outline">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Ver Histórico
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          </Tabs>
+        <TabsContent value="movimentacoes">
+          <Card>
+            <CardContent className="p-4">
+              <QueryState
+                query={movementsQuery}
+                isEmpty={(d) => d.length === 0}
+                empty={<EmptyState title="Nenhuma movimentação ainda" description="Vendas, cancelamentos e ajustes aparecem aqui." />}
+              >
+                {(movements) => <MovementList movements={movements} />}
+              </QueryState>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-          {/* Adjustment Modal */}
-          <Dialog open={adjustmentModalOpen} onOpenChange={setAdjustmentModalOpen}>
-            <DialogContent>
+      {/* Detalhe do item: estoque mínimo e últimas movimentações */}
+      <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          {viewing && (
+            <>
               <DialogHeader>
-                <DialogTitle>Ajustar Estoque</DialogTitle>
-                <DialogDescription>
-                  Produto: {selectedProduct?.productName}
-                  <br />
-                  Estoque atual: {selectedProduct?.currentStock} unidades
-                </DialogDescription>
+                <DialogTitle>{viewing.productName}</DialogTitle>
+                <DialogDescription>{viewing.sku ? `SKU ${viewing.sku} · ` : ''}{viewing.category}</DialogDescription>
               </DialogHeader>
-
-              <div className="space-y-4">
-                <div>
-                  <Label>Tipo de Ajuste</Label>
-                  <Select 
-                    value={adjustmentData.type} 
-                    onValueChange={(value) => setAdjustmentData(prev => ({ ...prev, type: value as 'add' | 'remove' }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="add">
-                        <div className="flex items-center gap-2">
-                          <Plus className="h-4 w-4 text-green-600" />
-                          Adicionar ao Estoque
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="remove">
-                        <div className="flex items-center gap-2">
-                          <Minus className="h-4 w-4 text-red-600" />
-                          Remover do Estoque
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+              <dl className="grid grid-cols-2 gap-3 text-sm">
+                <div><dt className="text-muted-foreground">Estoque atual</dt><dd className="text-lg font-semibold">{viewing.currentStock}</dd></div>
+                <div><dt className="text-muted-foreground">Situação</dt><dd><StatusBadge kind="stock" value={level(viewing)} /></dd></div>
+                <div><dt className="text-muted-foreground">Custo médio</dt><dd>{formatCurrency(viewing.averageCost)}</dd></div>
+                <div><dt className="text-muted-foreground">Valor em estoque</dt><dd>{formatCurrency(viewing.currentStock * viewing.averageCost)}</dd></div>
+              </dl>
+              <form
+                className="flex items-end gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const value = parseInt(minStock, 10);
+                  if (Number.isNaN(value) || value < 0) return FeedbackService.error('Informe um número inteiro a partir de 0.');
+                  minStockMutation.mutate({ id: viewing.productId, value });
+                }}
+              >
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="estoque-minimo">Estoque mínimo (alerta de reposição)</Label>
+                  <Input id="estoque-minimo" type="number" min="0" step="1" inputMode="numeric" value={minStock} onChange={(e) => setMinStock(e.target.value)} />
                 </div>
-
-                <div>
-                  <Label htmlFor="quantity">Quantidade *</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    min="1"
-                    value={adjustmentData.quantity}
-                    onChange={(e) => setAdjustmentData(prev => ({ ...prev, quantity: e.target.value }))}
-                    placeholder="Digite a quantidade"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="reason">Motivo *</Label>
-                  <Textarea
-                    id="reason"
-                    value={adjustmentData.reason}
-                    onChange={(e) => setAdjustmentData(prev => ({ ...prev, reason: e.target.value }))}
-                    placeholder="Descreva o motivo do ajuste..."
-                    rows={3}
-                  />
-                </div>
-
-                {adjustmentData.type === 'add' && (
-                  <div>
-                    <Label htmlFor="cost">Custo Unitário (opcional)</Label>
-                    <Input
-                      id="cost"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={adjustmentData.cost}
-                      onChange={(e) => setAdjustmentData(prev => ({ ...prev, cost: e.target.value }))}
-                      placeholder="R$ 0,00"
-                    />
-                  </div>
-                )}
+                <Button type="submit" variant="outline" disabled={minStockMutation.isPending}>Salvar</Button>
+              </form>
+              <div>
+                <h3 className="mb-1 text-sm font-semibold">Últimas movimentações</h3>
+                {(() => {
+                  const own = (movementsQuery.data ?? []).filter((m) => m.productId === viewing.productId);
+                  return own.length ? <MovementList movements={own.slice(0, 10)} /> : <p className="py-3 text-sm text-muted-foreground">Nenhuma movimentação registrada.</p>;
+                })()}
               </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setAdjustmentModalOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button 
-                  onClick={handleSubmitAdjustment}
-                  disabled={adjustInventoryMutation.isPending}
-                >
-                  {adjustInventoryMutation.isPending ? 'Processando...' : 'Confirmar Ajuste'}
-                </Button>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" asChild><Link to={`/painel/produtos/editar/${viewing.productId}`}>Editar produto</Link></Button>
+                <Button onClick={() => { const v = viewing; setViewing(null); openAdjust(v); }}>Ajustar estoque</Button>
               </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </AppShell>
-    </RoleGuard>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!adjusting} onOpenChange={(o) => !o && setAdjusting(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajustar estoque</DialogTitle>
+            <DialogDescription>{adjusting?.productName} · hoje: {adjusting?.currentStock} unidade(s)</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="tipo-ajuste">Tipo de ajuste</Label>
+              <Select value={adjust.type} onValueChange={(v) => setAdjust((a) => ({ ...a, type: v as 'add' | 'remove' }))}>
+                <SelectTrigger id="tipo-ajuste"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="add">Entrada (adicionar)</SelectItem>
+                  <SelectItem value="remove">Saída (remover)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="qtd-ajuste">Quantidade *</Label>
+              <Input id="qtd-ajuste" type="number" min="1" step="1" inputMode="numeric" value={adjust.quantity} onChange={(e) => setAdjust((a) => ({ ...a, quantity: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="motivo-ajuste">Motivo *</Label>
+              <Textarea id="motivo-ajuste" rows={3} value={adjust.reason} onChange={(e) => setAdjust((a) => ({ ...a, reason: e.target.value }))} placeholder="Ex.: reposição do fornecedor, avaria, inventário" />
+            </div>
+            {adjust.type === 'add' && (
+              <div className="space-y-2">
+                <Label htmlFor="custo-ajuste">Custo unitário (opcional)</Label>
+                <Input id="custo-ajuste" type="number" min="0" step="0.01" inputMode="decimal" value={adjust.cost} onChange={(e) => setAdjust((a) => ({ ...a, cost: e.target.value }))} placeholder="0,00" />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAdjusting(null)}>Cancelar</Button>
+            <Button onClick={submitAdjust} disabled={adjustMutation.isPending}>{adjustMutation.isPending ? 'Salvando…' : 'Confirmar ajuste'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

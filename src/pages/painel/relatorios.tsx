@@ -15,9 +15,9 @@ import {
   Filter,
   Printer
 } from 'lucide-react';
-import { AppShell } from '@/components/AppShell';
-import { RoleGuard } from '@/components/RoleGuard';
 import { Button } from '@/components/ui/button';
+import { MetricCard } from '@/components/MetricCard';
+import { ErrorState, PageLoader, PageHeader } from '@/components/PageStates';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -44,17 +44,17 @@ import {
 export function RelatoriosPage() {
   const [periodFilter, setPeriodFilter] = useState<string>('month');
 
-  const { data: salesReport, isLoading: salesLoading } = useQuery({
+  const { data: salesReport, isLoading: salesLoading, error: loadError0, refetch: reload0 } = useQuery({
     queryKey: ['sales-report', periodFilter],
     queryFn: () => ReportsService.getSalesReport(periodFilter)
   });
 
-  const { data: conversionReport, isLoading: conversionLoading } = useQuery({
+  const { data: conversionReport, isLoading: conversionLoading, error: loadError1, refetch: reload1 } = useQuery({
     queryKey: ['conversion-report', periodFilter],
     queryFn: () => ReportsService.getConversionReport(periodFilter)
   });
 
-  const { data: funnelReport, isLoading: funnelLoading } = useQuery({
+  const { data: funnelReport, isLoading: funnelLoading, error: loadError2, refetch: reload2 } = useQuery({
     queryKey: ['funnel-report', periodFilter],
     queryFn: () => ReportsService.getFunnelReport(periodFilter)
   });
@@ -64,11 +64,11 @@ export function RelatoriosPage() {
 
   // Sugestões só aparecem quando a etapa tem perda real no período (índice da etapa no funil).
   const suggestions = [
-    { index: 2, icon: TrendingUp, color: 'bg-yellow-100 text-yellow-800', title: 'Otimize a página de produto',
+    { index: 2, icon: TrendingUp, color: 'bg-warning-muted text-warning', title: 'Otimize a página de produto',
       text: (p: string) => `${p}% de quem viu um produto não adicionou ao carrinho. Melhore descrições, fotos e destaque avaliações.` },
-    { index: 3, icon: DollarSign, color: 'bg-green-100 text-green-800', title: 'Recupere carrinhos abandonados',
+    { index: 3, icon: DollarSign, color: 'bg-success-muted text-success', title: 'Recupere carrinhos abandonados',
       text: (p: string) => `${p}% de quem adicionou ao carrinho não iniciou o checkout. Considere cupons ou lembretes para recuperar essas vendas.` },
-    { index: 4, icon: Target, color: 'bg-blue-100 text-blue-800', title: 'Simplifique o checkout',
+    { index: 4, icon: Target, color: 'bg-info-muted text-info', title: 'Simplifique o checkout',
       text: (p: string) => `${p}% de quem iniciou o checkout não concluiu a compra. Reduza campos obrigatórios e revise as opções de frete e pagamento.` },
   ].filter((sug) => (funnelReport?.steps[sug.index]?.dropoffRate ?? 0) > 0);
 
@@ -90,36 +90,21 @@ export function RelatoriosPage() {
     }
   };
 
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+  const COLORS = ['hsl(var(--primary))', 'hsl(var(--info))', 'hsl(var(--warning))', 'hsl(var(--success))', 'hsl(var(--destructive))', 'hsl(var(--muted-foreground))'];
 
   if (salesLoading || conversionLoading || funnelLoading) {
-    return (
-      <RoleGuard requiredRole="EMPREENDEDOR">
-        <AppShell>
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </AppShell>
-      </RoleGuard>
-    );
+    return <PageLoader />;
   }
 
+  const loadError = loadError0 || loadError1 || loadError2;
+  if (loadError) return <ErrorState error={loadError} onRetry={() => { reload0(); reload1(); reload2(); }} />;
+
   return (
-    <RoleGuard requiredRole="EMPREENDEDOR">
-      <AppShell>
-        <div className="p-6 space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Relatórios
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Análise detalhada do desempenho da sua loja
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-3">
+    <div className="space-y-6">
+          <PageHeader
+            title="Relatórios"
+            description="Análise detalhada do desempenho da sua loja"
+            actions={<>
               <Select value={periodFilter} onValueChange={setPeriodFilter}>
                 <SelectTrigger className="w-40">
                   <Calendar className="h-4 w-4 mr-2" />
@@ -137,8 +122,8 @@ export function RelatoriosPage() {
                 <Printer className="h-4 w-4 mr-2" />
                 Imprimir
               </Button>
-            </div>
-          </div>
+            </>}
+          />
 
           <Tabs defaultValue="sales" className="space-y-6">
             <TabsList>
@@ -158,54 +143,18 @@ export function RelatoriosPage() {
 
             <TabsContent value="sales" className="space-y-6">
               {/* Sales Overview */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Total de Vendas</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {formatCurrency(salesReport?.totalSales || 0)}
-                        </p>
-                      </div>
-                      <DollarSign className="h-8 w-8 text-green-600" />
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <MetricCard title="Total de Vendas" value={formatCurrency(salesReport?.totalSales || 0)} icon={DollarSign} />
+
+                <MetricCard title="Total de Pedidos" value={salesReport?.totalOrders || 0} icon={ShoppingBag} />
+
+                <MetricCard title="Ticket Médio" value={formatCurrency(salesReport?.averageTicket || 0)} icon={Users} />
 
                 <Card>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Total de Pedidos</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {salesReport?.totalOrders || 0}
-                        </p>
-                      </div>
-                      <ShoppingBag className="h-8 w-8 text-blue-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Ticket Médio</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {formatCurrency(salesReport?.averageTicket || 0)}
-                        </p>
-                      </div>
-                      <Users className="h-8 w-8 text-purple-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Ações</p>
+                        <p className="text-sm text-muted-foreground">Ações</p>
                         <div className="flex items-center gap-2 mt-2">
                           <Button 
                             variant="outline" 
@@ -217,7 +166,7 @@ export function RelatoriosPage() {
                           </Button>
                         </div>
                       </div>
-                      <FileText className="h-8 w-8 text-gray-400" />
+                      <FileText className="h-8 w-8 text-muted-foreground" />
                     </div>
                   </CardContent>
                 </Card>
@@ -266,7 +215,7 @@ export function RelatoriosPage() {
                           type="monotone" 
                           dataKey="sales" 
                           name="Vendas" 
-                          stroke="#1DC37E" 
+                          stroke="hsl(var(--primary))" 
                           activeDot={{ r: 8 }} 
                           strokeWidth={2}
                         />
@@ -275,7 +224,7 @@ export function RelatoriosPage() {
                           type="monotone" 
                           dataKey="orders" 
                           name="Pedidos" 
-                          stroke="#8884d8" 
+                          stroke="hsl(var(--info))" 
                           strokeDasharray="5 5"
                         />
                       </LineChart>
@@ -325,7 +274,7 @@ export function RelatoriosPage() {
                             cy="50%"
                             labelLine={false}
                             outerRadius={80}
-                            fill="#8884d8"
+                            fill="hsl(var(--info))"
                             dataKey="revenue"
                             nameKey="name"
                             label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
@@ -349,54 +298,18 @@ export function RelatoriosPage() {
 
             <TabsContent value="conversion" className="space-y-6">
               {/* Conversion Overview */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Total de Visitantes</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {(conversionReport?.totalVisitors ?? 0).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                      <Users className="h-8 w-8 text-blue-600" />
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <MetricCard title="Total de Visitantes" value={(conversionReport?.totalVisitors ?? 0).toLocaleString('pt-BR')} icon={Users} />
+
+                <MetricCard title="Conversões" value={(conversionReport?.totalConversions ?? 0).toLocaleString('pt-BR')} icon={ShoppingBag} />
+
+                <MetricCard title="Taxa de Conversão" value={`${(conversionReport?.conversionRate ?? 0).toFixed(1)}%`} icon={Percent} />
 
                 <Card>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Conversões</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {(conversionReport?.totalConversions ?? 0).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                      <ShoppingBag className="h-8 w-8 text-green-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Taxa de Conversão</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {(conversionReport?.conversionRate ?? 0).toFixed(1)}%
-                        </p>
-                      </div>
-                      <Percent className="h-8 w-8 text-purple-600" />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Ações</p>
+                        <p className="text-sm text-muted-foreground">Ações</p>
                         <div className="flex items-center gap-2 mt-2">
                           <Button 
                             variant="outline" 
@@ -408,7 +321,7 @@ export function RelatoriosPage() {
                           </Button>
                         </div>
                       </div>
-                      <FileText className="h-8 w-8 text-gray-400" />
+                      <FileText className="h-8 w-8 text-muted-foreground" />
                     </div>
                   </CardContent>
                 </Card>
@@ -449,13 +362,13 @@ export function RelatoriosPage() {
                         <Bar 
                           dataKey="visitors" 
                           name="Visitantes" 
-                          fill="#1DC37E"
+                          fill="hsl(var(--primary))"
                           radius={[0, 4, 4, 0]}
                         />
                         <Bar 
                           dataKey="conversionRate" 
                           name="Taxa de Conversão (%)" 
-                          fill="#8884d8"
+                          fill="hsl(var(--info))"
                           radius={[0, 4, 4, 0]}
                         />
                       </BarChart>
@@ -492,14 +405,14 @@ export function RelatoriosPage() {
                           yAxisId="left"
                           dataKey="visitors" 
                           name="Visitantes" 
-                          fill="#8884d8"
+                          fill="hsl(var(--info))"
                           radius={[4, 4, 0, 0]}
                         />
                         <Bar 
                           yAxisId="right"
                           dataKey="rate" 
                           name="Taxa de Conversão (%)" 
-                          fill="#1DC37E"
+                          fill="hsl(var(--primary))"
                           radius={[4, 4, 0, 0]}
                         />
                       </BarChart>
@@ -512,48 +425,12 @@ export function RelatoriosPage() {
 
             <TabsContent value="funnel" className="space-y-6">
               {/* Funnel Overview */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Visitantes Totais</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {(funnelReport?.totalVisitors ?? 0).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                      <Users className="h-8 w-8 text-blue-600" />
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+                <MetricCard title="Visitantes Totais" value={(funnelReport?.totalVisitors ?? 0).toLocaleString('pt-BR')} icon={Users} />
 
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Conversões Finais</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {(funnelReport?.finalConversions ?? 0).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                      <Target className="h-8 w-8 text-green-600" />
-                    </div>
-                  </CardContent>
-                </Card>
+                <MetricCard title="Conversões Finais" value={(funnelReport?.finalConversions ?? 0).toLocaleString('pt-BR')} icon={Target} />
 
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Taxa de Conversão</p>
-                        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                          {(funnelReport?.overallConversionRate ?? 0).toFixed(1)}%
-                        </p>
-                      </div>
-                      <Percent className="h-8 w-8 text-purple-600" />
-                    </div>
-                  </CardContent>
-                </Card>
+                <MetricCard title="Taxa de Conversão" value={`${(funnelReport?.overallConversionRate ?? 0).toFixed(1)}%`} icon={Percent} />
               </div>
 
               {/* Funnel Visualization */}
@@ -567,31 +444,31 @@ export function RelatoriosPage() {
                       <div key={index} className="space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
+                            <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
                               {index + 1}
                             </span>
                             <span className="font-medium">{step.name}</span>
                           </div>
                           <div className="text-sm">
                             <span className="font-medium">{step.visitors.toLocaleString('pt-BR')}</span>
-                            <span className="text-gray-500"> visitantes</span>
+                            <span className="text-muted-foreground"> visitantes</span>
                           </div>
                         </div>
-                        <div className="relative h-8 bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden">
+                        <div className="relative h-8 bg-muted rounded-lg overflow-hidden">
                           <div 
                             className="absolute top-0 left-0 h-full bg-primary rounded-lg"
                             style={{ width: `${step.conversionRate}%` }}
                           ></div>
                           <div className="absolute inset-0 flex items-center justify-between px-3">
-                            <span className="text-xs font-medium text-gray-900 dark:text-white">
+                            <span className="text-xs font-medium text-foreground">
                               {step.conversionRate.toFixed(1)}%
                             </span>
                             {index > 0 && step.dropoffRate > 0 && (
                               <div className="flex items-center gap-1 text-xs">
-                                <span className="text-red-600 dark:text-red-400">
+                                <span className="text-destructive">
                                   -{step.dropoffRate.toFixed(1)}%
                                 </span>
-                                <ArrowDownRight className="h-3 w-3 text-red-600 dark:text-red-400" />
+                                <ArrowDownRight className="h-3 w-3 text-destructive" />
                               </div>
                             )}
                           </div>
@@ -633,10 +510,10 @@ export function RelatoriosPage() {
                             <sug.icon className="h-5 w-5" />
                           </div>
                           <div>
-                            <h3 className="font-medium text-gray-900 dark:text-white mb-1">
+                            <h3 className="font-medium text-foreground mb-1">
                               {sug.title}
                             </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                            <p className="text-sm text-muted-foreground">
                               {sug.text(funnelReport!.steps[sug.index].dropoffRate.toFixed(1))}
                             </p>
                           </div>
@@ -650,7 +527,5 @@ export function RelatoriosPage() {
             </TabsContent>
           </Tabs>
         </div>
-      </AppShell>
-    </RoleGuard>
   );
 }

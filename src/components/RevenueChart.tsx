@@ -52,7 +52,7 @@ export function RevenueChart({ data, isLoading, period, onPeriodChange }: Revenu
         <div className="flex items-center justify-between">
           <CardTitle>Receita vs Visitas (últimos {period} dias)</CardTitle>
           <Select value={String(period)} onValueChange={(v) => onPeriodChange(Number(v))}>
-            <SelectTrigger className="w-32">
+            <SelectTrigger className="w-32" aria-label="Período do gráfico">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -64,7 +64,7 @@ export function RevenueChart({ data, isLoading, period, onPeriodChange }: Revenu
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-80 relative">
+        <div className="relative h-64 sm:h-80">
           {isEmpty && (
             <div className="absolute inset-0 z-10 flex items-center justify-center text-sm text-muted-foreground">
               Ainda não há vendas pagas nem visitas registradas neste período.
@@ -114,10 +114,10 @@ export function RevenueChart({ data, isLoading, period, onPeriodChange }: Revenu
                 yAxisId="visitas"
                 type="monotone" 
                 dataKey="visitas" 
-                stroke="#8884d8" 
+                stroke="hsl(var(--info))" 
                 strokeWidth={2}
                 strokeDasharray="5 5"
-                dot={{ fill: '#8884d8', strokeWidth: 2, r: 3 }}
+                dot={{ fill: 'hsl(var(--info))', strokeWidth: 2, r: 3 }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -128,7 +128,7 @@ export function RevenueChart({ data, isLoading, period, onPeriodChange }: Revenu
             <span className="text-muted-foreground">Receita (R$)</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-[#8884d8] rounded-full"></div>
+            <div className="w-3 h-3 bg-info rounded-full"></div>
             <span className="text-muted-foreground">Visitas</span>
           </div>
         </div>

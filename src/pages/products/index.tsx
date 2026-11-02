@@ -1,564 +1,286 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Grid3X3, List, Package, Eye, EyeOff, Edit, Trash2 } from 'lucide-react';
-import { AppShell } from '@/components/AppShell';
-import { RoleGuard } from '@/components/RoleGuard';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Edit, Eye, EyeOff, Package, Plus, Search, Trash2 } from 'lucide-react';
 import { ProductAdminCard } from '@/components/ProductAdminCard';
+import { EmptyState, IconButton, PageHeader, QueryState } from '@/components/PageStates';
+import { StatusBadge, stockLevel } from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { ProductService } from '@/services/ProductService';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ProductService, type Product } from '@/services/ProductService';
 import { FeedbackService } from '@/services/FeedbackService';
-import { useAuth } from '@/contexts/AuthContext';
 import { useDebounce } from '@/hooks/useDebounce';
 import { formatCurrency } from '@/lib/utils';
 
-export function ProductsPage() {
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('date');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
-    return (localStorage.getItem('products-view-mode') as 'grid' | 'table') || 'grid';
-  });
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+const FILTERS = { categoria: 'all', status: 'all', estoque: 'all', ordem: 'date' } as const;
+type FilterKey = keyof typeof FILTERS;
 
+export function ProductsPage() {
+  const [params, setParams] = useSearchParams();
+  const get = (k: FilterKey) => params.get(k) ?? FILTERS[k];
+  const [search, setSearch] = useState(params.get('q') ?? '');
+  const q = useDebounce(search, 300).trim().toLowerCase();
+  const [selected, setSelected] = useState<string[]>([]);
+  const [toDelete, setToDelete] = useState<string[] | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const debouncedSearch = useDebounce(searchQuery, 300);
 
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: ['products', user?.lojaId],
-    queryFn: () => ProductService.getMyProducts()
-  });
+  const productsQuery = useQuery({ queryKey: ['products'], queryFn: () => ProductService.getMyProducts() });
 
-  const { data: categoryCounts = {} } = useQuery({
-    queryKey: ['category-counts', user?.lojaId],
-    queryFn: () => ProductService.getCategoryCounts()
-  });
+  const setParam = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value && value !== (FILTERS as Record<string, string>)[key]) next.set(key, value); else next.delete(key);
+    setParams(next, { replace: true });
+  };
+
+  const invalidate = () => ['products', 'category-counts', 'product-stats', 'inventory'].forEach((k) => queryClient.invalidateQueries({ queryKey: [k] }));
 
   const deleteMutation = useMutation({
-    mutationFn: ProductService.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['category-counts'] });
-      queryClient.invalidateQueries({ queryKey: ['product-stats'] });
-      FeedbackService.success('Produto excluído com sucesso!');
-      setDeleteId(null);
+    mutationFn: (ids: string[]) => (ids.length === 1 ? ProductService.delete(ids[0]) : ProductService.deleteMany(ids)),
+    onSuccess: (_, ids) => {
+      invalidate();
+      FeedbackService.success(ids.length === 1 ? 'Produto excluído.' : `${ids.length} produtos excluídos.`);
+      setSelected((s) => s.filter((id) => !ids.includes(id)));
+      setToDelete(null);
     },
-    onError: () => {
-      FeedbackService.error('Erro ao excluir produto');
-    }
+    onError: (e: Error) => FeedbackService.error(e.message || 'Não foi possível excluir.'),
   });
 
-  const deleteManyMutation = useMutation({
-    mutationFn: ProductService.deleteMany,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['category-counts'] });
-      queryClient.invalidateQueries({ queryKey: ['product-stats'] });
-      FeedbackService.success('Produtos excluídos com sucesso!');
-      setSelectedProducts([]);
-    },
-    onError: () => {
-      FeedbackService.error('Erro ao excluir produtos');
-    }
-  });
-
-  const toggleStatusMutation = useMutation({
+  const toggleMutation = useMutation({
     mutationFn: ProductService.toggleStatus,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['product-stats'] });
-      FeedbackService.success('Status do produto atualizado!');
-    },
-    onError: () => {
-      FeedbackService.error('Erro ao atualizar status do produto');
-    }
+    onSuccess: (p) => { invalidate(); FeedbackService.success(p.ativo ? 'Produto ativado.' : 'Produto desativado.'); },
+    onError: (e: Error) => FeedbackService.error(e.message || 'Não foi possível alterar o status.'),
   });
 
-  const toggleManyStatusMutation = useMutation({
-    mutationFn: ({ ids, status }: { ids: string[]; status: boolean }) =>
-      ProductService.toggleManyStatus(ids, status),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['product-stats'] });
-      FeedbackService.success('Status dos produtos atualizado!');
-      setSelectedProducts([]);
-    },
-    onError: () => {
-      FeedbackService.error('Erro ao atualizar status dos produtos');
-    }
+  const bulkStatusMutation = useMutation({
+    mutationFn: ({ ids, status }: { ids: string[]; status: boolean }) => ProductService.toggleManyStatus(ids, status),
+    onSuccess: () => { invalidate(); FeedbackService.success('Status dos produtos atualizado.'); setSelected([]); },
+    onError: (e: Error) => FeedbackService.error(e.message || 'Não foi possível alterar o status.'),
   });
 
-  const handleEdit = (id: string) => {
-    navigate(`/painel/produtos/editar/${id}`);
-  };
-
-  const handleDelete = (id: string) => {
-    setDeleteId(id);
-  };
-
-  const handleToggleStatus = (id: string) => {
-    toggleStatusMutation.mutate(id);
-  };
-
-  const confirmDelete = () => {
-    if (deleteId) {
-      deleteMutation.mutate(deleteId);
-    }
-  };
-
-  const handleViewModeChange = (mode: 'grid' | 'table') => {
-    setViewMode(mode);
-    localStorage.setItem('products-view-mode', mode);
-  };
-
-  const handleSortChange = (sort: string) => {
-    setSortBy(sort);
-    localStorage.setItem('products-sort-by', sort);
-  };
-
-  const handleProductSelect = (productId: string, checked: boolean) => {
-    if (checked) {
-      setSelectedProducts(prev => [...prev, productId]);
-    } else {
-      setSelectedProducts(prev => prev.filter(id => id !== productId));
-    }
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedProducts(filteredProducts.map(p => p.id));
-    } else {
-      setSelectedProducts([]);
-    }
-  };
-
-  const handleBulkDelete = () => {
-    deleteManyMutation.mutate(selectedProducts);
-  };
-
-  const handleBulkActivate = () => {
-    toggleManyStatusMutation.mutate({ ids: selectedProducts, status: true });
-  };
-
-  const handleBulkDeactivate = () => {
-    toggleManyStatusMutation.mutate({ ids: selectedProducts, status: false });
-  };
-
-  // Filtrar e ordenar produtos
-  const filteredProducts = products
-    .filter(product => {
-      const matchesSearch = debouncedSearch === '' || 
-        product.nome.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        product.descricao.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        product.marca?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        product.sku?.toLowerCase().includes(debouncedSearch.toLowerCase());
-      
-      const matchesCategory = selectedCategory === 'all' || product.categoria === selectedCategory;
-      
-      return matchesSearch && matchesCategory;
-    })
+  const filter = (products: Product[]) => products
+    .filter((p) =>
+      (!q || [p.nome, p.descricao, p.marca, p.sku].some((v) => v?.toLowerCase().includes(q))) &&
+      (get('categoria') === 'all' || p.categoria === get('categoria')) &&
+      (get('status') === 'all' || p.ativo === (get('status') === 'ativo')) &&
+      (get('estoque') === 'all' ||
+        (get('estoque') === 'baixo' ? stockLevel(p.estoque, p.minStock) === 'low' : stockLevel(p.estoque, p.minStock) === 'out')))
     .sort((a, b) => {
-      switch (sortBy) {
-        case 'name':
-          return a.nome.localeCompare(b.nome);
-        case 'price':
-          return a.preco - b.preco;
-        case 'date':
-        default:
-          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      }
+      if (get('ordem') === 'name') return a.nome.localeCompare(b.nome);
+      if (get('ordem') === 'price') return a.preco - b.preco;
+      return b.updatedAt.getTime() - a.updatedAt.getTime();
     });
 
-  const categories = ProductService.getCategories();
-
-  if (isLoading) {
-    return (
-      <RoleGuard requiredRole="EMPREENDEDOR">
-        <AppShell>
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </AppShell>
-      </RoleGuard>
-    );
-  }
+  const edit = (id: string) => navigate(`/painel/produtos/editar/${id}`);
+  const hasFilters = !!q || (['categoria', 'status', 'estoque'] as FilterKey[]).some((k) => get(k) !== FILTERS[k]);
+  const deleteNames = toDelete?.length === 1 ? productsQuery.data?.find((p) => p.id === toDelete[0])?.nome : undefined;
 
   return (
-    <RoleGuard requiredRole="EMPREENDEDOR">
-      <AppShell>
-        <TooltipProvider>
-          <div className="p-6 space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Meus Produtos
-                </h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                  Gerencie seu catálogo de produtos ({filteredProducts.length} produtos)
-                </p>
-              </div>
-              <Button
-                onClick={() => navigate('/painel/produtos/novo')}
-                className="bg-primary hover:bg-primary-hover"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Produto
-              </Button>
-            </div>
+    <div>
+      <PageHeader
+        title="Produtos"
+        description="Cadastre, edite e organize o catálogo da sua loja."
+        actions={<Button asChild><Link to="/painel/produtos/novo"><Plus className="mr-2 h-4 w-4" aria-hidden="true" />Novo produto</Link></Button>}
+      />
 
-            {/* Filtros e Busca */}
-            <div className="flex flex-col lg:flex-row gap-4 items-center">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Buscar produtos..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="relative sm:col-span-2 lg:col-span-1">
+          <Label htmlFor="busca-produtos" className="sr-only">Buscar produtos</Label>
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            id="busca-produtos"
+            placeholder="Nome, marca ou SKU"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setParam('q', e.target.value); }}
+            className="pl-10"
+          />
+        </div>
+        <Select value={get('categoria')} onValueChange={(v) => setParam('categoria', v)}>
+          <SelectTrigger aria-label="Categoria"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as categorias</SelectItem>
+            {ProductService.getCategories().map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={get('status')} onValueChange={(v) => setParam('status', v)}>
+          <SelectTrigger aria-label="Status"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Ativos e inativos</SelectItem>
+            <SelectItem value="ativo">Só ativos</SelectItem>
+            <SelectItem value="inativo">Só inativos</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={get('estoque')} onValueChange={(v) => setParam('estoque', v)}>
+          <SelectTrigger aria-label="Estoque"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todo o estoque</SelectItem>
+            <SelectItem value="baixo">Estoque baixo</SelectItem>
+            <SelectItem value="esgotado">Esgotados</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={get('ordem')} onValueChange={(v) => setParam('ordem', v)}>
+          <SelectTrigger aria-label="Ordenar por"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="date">Atualizados recentemente</SelectItem>
+            <SelectItem value="name">Nome (A–Z)</SelectItem>
+            <SelectItem value="price">Menor preço</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <QueryState
+        query={productsQuery}
+        isEmpty={(d) => d.length === 0}
+        empty={
+          <Card>
+            <EmptyState
+              icon={Package}
+              title="Nenhum produto cadastrado"
+              description="Cadastre o primeiro produto para começar a vender."
+              action={<Button asChild><Link to="/painel/produtos/novo">Cadastrar produto</Link></Button>}
+            />
+          </Card>
+        }
+      >
+        {(products) => {
+          const list = filter(products);
+          const allSelected = list.length > 0 && list.every((p) => selected.includes(p.id));
+          const toggle = (id: string, checked: boolean) => setSelected((s) => (checked ? [...s, id] : s.filter((x) => x !== id)));
+          if (list.length === 0) {
+            return (
+              <Card>
+                <EmptyState
+                  icon={Search}
+                  title="Nenhum produto com esses filtros"
+                  action={hasFilters && <Button variant="outline" onClick={() => { setSearch(''); setParams({}, { replace: true }); }}>Limpar filtros</Button>}
                 />
-              </div>
-              
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-full lg:w-48">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    Todas as categorias ({products.length})
-                  </SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category} ({categoryCounts[category] || 0})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={sortBy} onValueChange={handleSortChange}>
-                <SelectTrigger className="w-full lg:w-48">
-                  <SelectValue placeholder="Ordenar por" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="date">Data de criação</SelectItem>
-                  <SelectItem value="name">Nome</SelectItem>
-                  <SelectItem value="price">Preço</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <div className="flex items-center gap-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={viewMode === 'grid' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => handleViewModeChange('grid')}
-                    >
-                      <Grid3X3 className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Visualizar em grade</TooltipContent>
-                </Tooltip>
-                
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant={viewMode === 'table' ? 'default' : 'outline'}
-                      size="icon"
-                      onClick={() => handleViewModeChange('table')}
-                    >
-                      <List className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Visualizar em lista</TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
-
-            {/* Bulk Actions */}
-            {selectedProducts.length > 0 && (
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">
-                    {selectedProducts.length} produto(s) selecionado(s)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={handleBulkActivate}>
-                      Ativar Selecionados
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleBulkDeactivate}>
-                      Desativar Selecionados
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={handleBulkDelete}>
-                      Excluir Selecionados
-                    </Button>
-                  </div>
+              </Card>
+            );
+          }
+          return (
+            <>
+              {selected.length > 0 && (
+                <div role="region" aria-label="Ações em lote" className="sticky top-16 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 shadow-sm">
+                  <span className="mr-auto text-sm font-medium">{selected.length} selecionado(s)</span>
+                  <Button variant="outline" size="sm" onClick={() => bulkStatusMutation.mutate({ ids: selected, status: true })} disabled={bulkStatusMutation.isPending}>Ativar</Button>
+                  <Button variant="outline" size="sm" onClick={() => bulkStatusMutation.mutate({ ids: selected, status: false })} disabled={bulkStatusMutation.isPending}>Desativar</Button>
+                  <Button variant="destructive" size="sm" onClick={() => setToDelete(selected)}>Excluir</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setSelected([])}>Limpar seleção</Button>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Conteúdo */}
-            {filteredProducts.length === 0 ? (
-              <div className="text-center py-12">
-                <Package className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-                  {searchQuery || selectedCategory !== 'all' 
-                    ? 'Nenhum produto encontrado' 
-                    : 'Nenhum produto cadastrado'
-                  }
-                </h3>
-                <p className="mt-2 text-gray-600 dark:text-gray-400">
-                  {searchQuery || selectedCategory !== 'all'
-                    ? 'Tente ajustar os filtros de busca'
-                    : 'Comece criando seu primeiro produto'
-                  }
-                </p>
-                {!searchQuery && selectedCategory === 'all' && (
-                  <Button
-                    onClick={() => navigate('/painel/produtos/novo')}
-                    className="mt-4"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Criar Primeiro Produto
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <>
-                {/* Grid View */}
-                {viewMode === 'grid' && (
-                  <div className="space-y-4">
-                    {viewMode === 'grid' && (
-                      <div className="flex items-center gap-2">
+              <Card className="hidden md:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">
                         <Checkbox
-                          checked={selectedProducts.length === filteredProducts.length}
-                          onCheckedChange={handleSelectAll}
+                          checked={allSelected}
+                          onCheckedChange={(c) => setSelected(c === true ? list.map((p) => p.id) : [])}
+                          aria-label="Selecionar todos os produtos da lista"
                         />
-                        <span className="text-sm text-gray-600">Selecionar todos</span>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {filteredProducts.map((product) => (
-                        <div key={product.id} className="relative">
-                          <div className="absolute top-2 left-2 z-10">
-                            <Checkbox
-                              checked={selectedProducts.includes(product.id)}
-                              onCheckedChange={(checked) => 
-                                handleProductSelect(product.id, checked as boolean)
-                              }
-                            />
+                      </TableHead>
+                      <TableHead>Produto</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead className="text-right">Preço</TableHead>
+                      <TableHead>Estoque</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {list.map((p) => (
+                      <TableRow key={p.id} data-state={selected.includes(p.id) ? 'selected' : undefined}>
+                        <TableCell>
+                          <Checkbox checked={selected.includes(p.id)} onCheckedChange={(c) => toggle(p.id, c === true)} aria-label={`Selecionar ${p.nome}`} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                              {p.imagem ? <img src={p.imagem} alt="" loading="lazy" className="h-full w-full object-cover" /> : <Package className="h-5 w-5 text-muted-foreground" aria-hidden="true" />}
+                            </div>
+                            <div className="min-w-0">
+                              <Link to={`/painel/produtos/editar/${p.id}`} className="font-medium hover:text-primary hover:underline">{p.nome}</Link>
+                              {p.sku && <p className="text-xs text-muted-foreground">SKU {p.sku}</p>}
+                            </div>
                           </div>
-                          <ProductAdminCard
-                            product={product}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                            onToggleStatus={handleToggleStatus}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{p.categoria}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(p.desconto ? p.preco * (1 - p.desconto / 100) : p.preco)}
+                          {!!p.desconto && <span className="block text-xs text-muted-foreground line-through">{formatCurrency(p.preco)}</span>}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{p.estoque}</span>
+                            {stockLevel(p.estoque, p.minStock) !== 'ok' && <StatusBadge kind="stock" value={stockLevel(p.estoque, p.minStock)} />}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={p.ativo ? 'text-sm text-success' : 'text-sm text-muted-foreground'}>{p.ativo ? 'Ativo' : 'Inativo'}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                            <IconButton label={p.ativo ? `Desativar ${p.nome}` : `Ativar ${p.nome}`} icon={p.ativo ? EyeOff : Eye} onClick={() => toggleMutation.mutate(p.id)} />
+                            <IconButton label={`Editar ${p.nome}`} icon={Edit} onClick={() => edit(p.id)} />
+                            <IconButton label={`Excluir ${p.nome}`} icon={Trash2} className="text-destructive hover:text-destructive" onClick={() => setToDelete([p.id])} />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
 
-                {/* Table View */}
-                {viewMode === 'table' && (
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-12">
-                            <Checkbox
-                              checked={selectedProducts.length === filteredProducts.length}
-                              onCheckedChange={handleSelectAll}
-                            />
-                          </TableHead>
-                          <TableHead>Produto</TableHead>
-                          <TableHead>Categoria</TableHead>
-                          <TableHead>Preço</TableHead>
-                          <TableHead>Estoque</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Ações</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredProducts.map((product) => {
-                          const precoComDesconto = product.desconto 
-                            ? product.preco * (1 - product.desconto / 100)
-                            : product.preco;
+              <div className="space-y-3 md:hidden">
+                <div className="flex items-center gap-2 px-1">
+                  <Checkbox
+                    id="selecionar-todos-mobile"
+                    checked={allSelected}
+                    onCheckedChange={(c) => setSelected(c === true ? list.map((p) => p.id) : [])}
+                  />
+                  <Label htmlFor="selecionar-todos-mobile" className="text-sm">Selecionar todos ({list.length})</Label>
+                </div>
+                {list.map((p) => (
+                  <ProductAdminCard
+                    key={p.id}
+                    product={p}
+                    onEdit={edit}
+                    onDelete={(id) => setToDelete([id])}
+                    onToggleStatus={(id) => toggleMutation.mutate(id)}
+                    selected={selected.includes(p.id)}
+                    onSelect={(c) => toggle(p.id, c)}
+                  />
+                ))}
+              </div>
+            </>
+          );
+        }}
+      </QueryState>
 
-                          return (
-                            <TableRow key={product.id}>
-                              <TableCell>
-                                <Checkbox
-                                  checked={selectedProducts.includes(product.id)}
-                                  onCheckedChange={(checked) => 
-                                    handleProductSelect(product.id, checked as boolean)
-                                  }
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center space-x-3">
-                                  <div className="h-12 w-12 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center overflow-hidden">
-                                    {product.imagem ? (
-                                      <img 
-                                        src={product.imagem} 
-                                        alt={product.nome}
-                                        className="h-full w-full object-cover"
-                                      />
-                                    ) : (
-                                      <Package className="h-5 w-5 text-gray-400" />
-                                    )}
-                                  </div>
-                                  <div>
-                                    <div className="font-medium text-gray-900 dark:text-white">
-                                      {product.nome}
-                                    </div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                                      {product.marca && `${product.marca} • `}
-                                      {product.sku}
-                                    </div>
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <span className="inline-block px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">
-                                  {product.categoria}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-primary">
-                                    {formatCurrency(precoComDesconto)}
-                                  </span>
-                                  {product.desconto && product.desconto > 0 && (
-                                    <>
-                                      <span className="text-xs text-gray-500 line-through">
-                                        {formatCurrency(product.preco)}
-                                      </span>
-                                      <span className="text-xs bg-red-100 text-red-800 px-1.5 py-0.5 rounded">
-                                        -{product.desconto}%
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-                                    product.estoque > 10 
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                      : product.estoque > 0
-                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
-                                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-                                  }`}>
-                                    {product.estoque} unidades
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-                                  product.ativo 
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
-                                }`}>
-                                  {product.ativo ? 'Ativo' : 'Inativo'}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end space-x-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleToggleStatus(product.id)}
-                                    aria-label={product.ativo ? "Desativar produto" : "Ativar produto"}
-                                    className="h-8 w-8"
-                                  >
-                                    {product.ativo ? (
-                                      <Eye className="h-4 w-4 text-green-600" />
-                                    ) : (
-                                      <EyeOff className="h-4 w-4 text-gray-400" />
-                                    )}
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleEdit(product.id)}
-                                    aria-label="Editar produto"
-                                    className="h-8 w-8"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDelete(product.id)}
-                                    aria-label="Excluir produto"
-                                    className="h-8 w-8 text-red-600 hover:text-red-700"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Delete Confirmation Dialog */}
-            <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Confirmar Exclusão</DialogTitle>
-                  <DialogDescription>
-                    Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita e o produto será removido permanentemente do seu catálogo.
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setDeleteId(null)}>
-                    Cancelar
-                  </Button>
-                  <Button 
-                    variant="destructive" 
-                    onClick={confirmDelete}
-                    disabled={deleteMutation.isPending}
-                  >
-                    {deleteMutation.isPending ? 'Excluindo...' : 'Excluir Produto'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </TooltipProvider>
-      </AppShell>
-    </RoleGuard>
+      <Dialog open={!!toDelete} onOpenChange={(open) => !open && setToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{toDelete?.length === 1 ? 'Excluir produto?' : `Excluir ${toDelete?.length} produtos?`}</DialogTitle>
+            <DialogDescription>
+              {deleteNames ? `"${deleteNames}" será removido` : 'Os produtos selecionados serão removidos'} do catálogo. Esta ação não pode ser desfeita.
+              Pedidos já feitos continuam com o nome do produto.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setToDelete(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => toDelete && deleteMutation.mutate(toDelete)} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? 'Excluindo…' : 'Excluir'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

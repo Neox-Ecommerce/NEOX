@@ -1,519 +1,298 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useBlocker } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { AlertCircle, ImageIcon, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Package, X, ImageIcon, AlertCircle } from 'lucide-react';
-import { Product, ProductService } from '@/services/ProductService';
-import { formatCurrency } from '@/lib/utils';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { type CreateProductData, type Product, ProductService } from '@/services/ProductService';
+import { cn, formatCurrency } from '@/lib/utils';
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
+// Campo numérico vazio vira undefined (antes virava NaN e a mensagem era "Expected number, received nan").
+const num = (schema: z.ZodTypeAny) =>
+  z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : Number(v)), schema);
+const numberMsg = { invalid_type_error: 'Informe um número válido' };
+
 const productSchema = z.object({
-  nome: z.string().min(1, 'Nome é obrigatório').max(100, 'Nome deve ter no máximo 100 caracteres'),
-  descricao: z.string().min(10, 'Descrição deve ter pelo menos 10 caracteres').max(1000, 'Descrição deve ter no máximo 1000 caracteres'),
-  preco: z.number().min(0.01, 'Preço deve ser maior que zero'),
-  estoque: z.number().int().min(0, 'Estoque deve ser um número inteiro positivo'),
+  nome: z.string().trim().min(1, 'Informe o nome do produto').max(100, 'Use no máximo 100 caracteres'),
+  descricao: z.string().trim().min(10, 'Descreva o produto com pelo menos 10 caracteres').max(1000, 'Use no máximo 1000 caracteres'),
+  preco: num(z.number({ required_error: 'Informe o preço', ...numberMsg }).min(0.01, 'O preço deve ser maior que zero')),
+  estoque: num(z.number({ required_error: 'Informe a quantidade em estoque', ...numberMsg }).int('Use um número inteiro').min(0, 'O estoque não pode ser negativo')),
   imagem: z.string().optional(),
-  categoria: z.string().min(1, 'Categoria é obrigatória'),
-  ativo: z.boolean().default(true),
-  peso: z.number().min(0, 'Peso deve ser positivo').optional(),
+  categoria: z.string({ required_error: 'Escolha uma categoria' }).min(1, 'Escolha uma categoria'),
+  ativo: z.boolean(),
+  peso: num(z.number(numberMsg).min(0, 'O peso não pode ser negativo').optional()),
   dimensoes: z.string().optional(),
   marca: z.string().optional(),
   sku: z.string().optional(),
-  desconto: z.number().min(0).max(100, 'Desconto deve estar entre 0 e 100%').optional(),
+  desconto: num(z.number(numberMsg).min(0, 'O desconto vai de 0 a 100%').max(100, 'O desconto vai de 0 a 100%').optional()),
 });
 
-type ProductFormData = z.infer<typeof productSchema>;
+type FormInput = z.input<typeof productSchema>;
 
 interface ProductFormProps {
   product?: Product;
-  onSubmit: (data: ProductFormData) => Promise<void>;
+  /** Deve rejeitar em caso de erro (ex.: mutateAsync) para o formulário continuar com as alterações. */
+  onSubmit: (data: CreateProductData) => Promise<unknown>;
   loading?: boolean;
 }
 
 const categorias = ProductService.getCategories();
 
-export function ProductForm({ product, onSubmit, loading = false }: ProductFormProps) {
-  const [imagePreview, setImagePreview] = useState<string>('');
-  const [precoDisplay, setPrecoDisplay] = useState<string>('');
-  const [dragActive, setDragActive] = useState(false);
-  const [imageError, setImageError] = useState<string>('');
+const toDefaults = (p?: Product): FormInput => (p ? {
+  nome: p.nome, descricao: p.descricao, preco: p.preco, estoque: p.estoque, imagem: p.imagem ?? '', categoria: p.categoria,
+  ativo: p.ativo, peso: p.peso ?? '', dimensoes: p.dimensoes ?? '', marca: p.marca ?? '', sku: p.sku ?? '', desconto: p.desconto ?? '',
+} : { nome: '', descricao: '', preco: undefined, estoque: '', imagem: '', categoria: '', ativo: true, peso: '', dimensoes: '', marca: '', sku: '', desconto: '' });
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-    watch,
-    reset,
-    setError,
-    clearErrors
-  } = useForm<ProductFormData>({
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={id} className="flex items-center gap-1 text-sm text-destructive">
+      <AlertCircle className="h-3 w-3" aria-hidden="true" /> {message}
+    </p>
+  );
+}
+
+function LeaveDialog({ open, onStay, onLeave }: { open: boolean; onStay: () => void; onLeave: () => void }) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onStay()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Sair sem salvar?</DialogTitle>
+          <DialogDescription>As alterações feitas neste produto serão perdidas.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onStay}>Continuar editando</Button>
+          <Button variant="destructive" onClick={onLeave}>Sair sem salvar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Avisa antes de sair com alterações não salvas: navegação interna (useBlocker) e fechar/recarregar a aba. */
+function UnsavedChangesGuard({ shouldBlock }: { shouldBlock: () => boolean }) {
+  const blocker = useBlocker(() => shouldBlock());
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (shouldBlock()) e.preventDefault();
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [shouldBlock]);
+  return <LeaveDialog open={blocker.state === 'blocked'} onStay={() => blocker.reset?.()} onLeave={() => blocker.proceed?.()} />;
+}
+
+export function ProductForm({ product, onSubmit, loading = false }: ProductFormProps) {
+  const navigate = useNavigate();
+  const [precoDisplay, setPrecoDisplay] = useState(product ? formatCurrency(product.preco) : '');
+  const [dragActive, setDragActive] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const fileInput = useRef<HTMLInputElement>(null);
+  const saving = useRef(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+
+  const { register, handleSubmit, formState: { errors, isDirty }, setValue, watch, reset } = useForm<FormInput, unknown, CreateProductData>({
     resolver: zodResolver(productSchema),
-    defaultValues: product ? {
-      nome: product.nome,
-      descricao: product.descricao,
-      preco: product.preco,
-      estoque: product.estoque,
-      imagem: product.imagem,
-      categoria: product.categoria,
-      ativo: product.ativo,
-      peso: product.peso,
-      dimensoes: product.dimensoes,
-      marca: product.marca,
-      sku: product.sku,
-      desconto: product.desconto
-    } : {
-      ativo: true,
-      desconto: 0
-    }
+    defaultValues: toDefaults(product),
   });
 
   useEffect(() => {
-    if (product) {
-      setImagePreview(product.imagem || '');
-      setPrecoDisplay(formatCurrency(product.preco));
-      reset({
-        nome: product.nome,
-        descricao: product.descricao,
-        preco: product.preco,
-        estoque: product.estoque,
-        imagem: product.imagem,
-        categoria: product.categoria,
-        ativo: product.ativo,
-        peso: product.peso,
-        dimensoes: product.dimensoes,
-        marca: product.marca,
-        sku: product.sku,
-        desconto: product.desconto
-      });
-    }
+    if (!product) return;
+    reset(toDefaults(product));
+    setPrecoDisplay(formatCurrency(product.preco));
   }, [product, reset]);
 
-  const validateImage = (file: File): string | null => {
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      return 'Formato de imagem não suportado. Use JPG, PNG ou WebP.';
-    }
-    
-    if (file.size > MAX_FILE_SIZE) {
-      return 'Imagem muito grande. Máximo 5MB.';
-    }
-    
-    return null;
-  };
+  const dirtyRef = useRef(isDirty);
+  dirtyRef.current = isDirty;
+  const [shouldBlock] = useState(() => () => dirtyRef.current && !saving.current);
 
-  const handleImageUpload = (file: File) => {
+  const imagem = watch('imagem');
+  const ativo = watch('ativo');
+
+  const handleImage = (file: File) => {
     setImageError('');
-    clearErrors('imagem');
-    
-    const error = validateImage(file);
-    if (error) {
-      setImageError(error);
-      setError('imagem', { message: error });
-      return;
-    }
-
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) return setImageError('Formato não suportado. Use JPG, PNG ou WebP.');
+    if (file.size > MAX_FILE_SIZE) return setImageError('Imagem muito grande. O máximo é 5 MB.');
     const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setImagePreview(result);
-      setValue('imagem', result);
-    };
+    reader.onload = () => setValue('imagem', reader.result as string, { shouldDirty: true });
     reader.readAsDataURL(file);
-  };
-
-  const handleFileInput = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      handleImageUpload(file);
-    }
   };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
+    setDragActive(e.type === 'dragenter' || e.type === 'dragover');
+  };
+
+  const handlePreco = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, '');
+    const value = digits ? Number(digits) / 100 : undefined;
+    setPrecoDisplay(value === undefined ? '' : formatCurrency(value));
+    setValue('preco', value, { shouldDirty: true, shouldValidate: !!errors.preco });
+  };
+
+  const submit = async (data: CreateProductData) => {
+    saving.current = true;
+    try {
+      await onSubmit(data);
+    } catch {
+      // o erro já foi mostrado pelo chamador; mantém as alterações na tela
+    } finally {
+      saving.current = false;
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      handleImageUpload(file);
-    }
-  };
+  const cancel = () => (isDirty ? setLeaveOpen(true) : navigate('/painel/produtos'));
 
-  const removeImage = () => {
-    setImagePreview('');
-    setValue('imagem', '');
-    setImageError('');
-    clearErrors('imagem');
-  };
-
-  const handlePrecoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = event.target.value;
-    const numericValue = value.replace(/[^\d]/g, '');
-    const formattedValue = formatCurrency(parseFloat(numericValue) / 100 || 0);
-    
-    setPrecoDisplay(formattedValue);
-    setValue('preco', parseFloat(numericValue) / 100 || 0);
-  };
-
-  const handleFormSubmit = async (data: ProductFormData) => {
-    // Converter strings para números onde necessário
-    const processedData = {
-      ...data,
-      preco: Number(data.preco),
-      estoque: Number(data.estoque),
-      peso: data.peso ? Number(data.peso) : undefined,
-      desconto: data.desconto ? Number(data.desconto) : undefined
-    };
-    
-    await onSubmit(processedData);
-  };
+  const err = (name: keyof FormInput) => errors[name]?.message as string | undefined;
+  const a11y = (name: keyof FormInput) => ({ 'aria-invalid': !!errors[name], 'aria-describedby': errors[name] ? `${name}-erro` : undefined });
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <Card className="shadow-lg border-0">
-        <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-t-lg">
-          <CardTitle className="text-2xl font-bold flex items-center gap-2">
-            <Package className="h-6 w-6 text-primary" />
-            {product ? 'Editar Produto' : 'Novo Produto'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-6">
-          <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-8">
-            {/* Upload de Imagem */}
-            <div className="space-y-4">
-              <Label className="text-base font-semibold">Imagem do Produto</Label>
-              
-              {imagePreview ? (
-                <div className="relative">
-                  <div className="relative w-full h-64 rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-700">
-                    <img 
-                      src={imagePreview} 
-                      alt="Preview do produto" 
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        onClick={removeImage}
-                        className="bg-red-500 hover:bg-red-600"
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        Remover
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
-                    dragActive 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-gray-300 dark:border-gray-600 hover:border-primary hover:bg-primary/5'
-                  } ${imageError ? 'border-red-500 bg-red-50' : ''}`}
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
-                >
-                  <input
-                    type="file"
-                    accept={ACCEPTED_IMAGE_TYPES.join(',')}
-                    onChange={handleFileInput}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    id="image-upload"
-                  />
-                  <div className="space-y-4">
-                    <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                      <ImageIcon className="h-8 w-8 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-lg font-medium text-gray-900 dark:text-white">
-                        Arraste uma imagem aqui
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        ou clique para selecionar um arquivo
-                      </p>
-                    </div>
-                    <Button type="button" variant="outline" size="sm">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Escolher Arquivo
-                    </Button>
-                  </div>
-                </div>
-              )}
-              
-              {(imageError || errors.imagem) && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {imageError || errors.imagem?.message}
-                </p>
-              )}
-              
-              <p className="text-xs text-gray-500">
-                Formatos aceitos: JPG, PNG, WebP. Tamanho máximo: 5MB
-              </p>
+    <form onSubmit={handleSubmit(submit)} className="mx-auto max-w-4xl space-y-6" noValidate>
+      <UnsavedChangesGuard shouldBlock={shouldBlock} />
+      <LeaveDialog open={leaveOpen} onStay={() => setLeaveOpen(false)} onLeave={() => { saving.current = true; navigate('/painel/produtos'); }} />
+
+      <Card id="basico">
+        <CardHeader><CardTitle className="text-lg">Informações básicas</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="nome">Nome do produto *</Label>
+            <Input id="nome" {...register('nome')} {...a11y('nome')} placeholder="Ex.: Camiseta básica algodão" />
+            <FieldError id="nome-erro" message={err('nome')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="categoria">Categoria *</Label>
+            <Select value={watch('categoria')} onValueChange={(v) => setValue('categoria', v, { shouldDirty: true, shouldValidate: true })}>
+              <SelectTrigger id="categoria" {...a11y('categoria')}><SelectValue placeholder="Escolha uma categoria" /></SelectTrigger>
+              <SelectContent>
+                {categorias.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <FieldError id="categoria-erro" message={err('categoria')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="marca">Marca</Label>
+            <Input id="marca" {...register('marca')} />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="descricao">Descrição *</Label>
+            <Textarea id="descricao" rows={6} {...register('descricao')} {...a11y('descricao')} placeholder="Características, materiais, medidas, cuidados…" />
+            <div className="flex justify-between gap-2">
+              <FieldError id="descricao-erro" message={err('descricao')} />
+              <p className="ml-auto text-xs text-muted-foreground">{(watch('descricao') ?? '').length}/1000</p>
             </div>
-
-            {/* Informações Básicas */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="nome" className="text-sm font-medium">
-                    Nome do Produto *
-                  </Label>
-                  <Input
-                    id="nome"
-                    {...register('nome')}
-                    placeholder="Ex: iPhone 15 Pro Max"
-                    className="h-11"
-                  />
-                  {errors.nome && (
-                    <p className="text-sm text-red-500 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {errors.nome.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="categoria" className="text-sm font-medium">
-                    Categoria *
-                  </Label>
-                  <Select 
-                    value={watch('categoria')} 
-                    onValueChange={(value) => setValue('categoria', value)}
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Selecione uma categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categorias.map((categoria) => (
-                        <SelectItem key={categoria} value={categoria}>
-                          {categoria}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.categoria && (
-                    <p className="text-sm text-red-500 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {errors.categoria.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="marca" className="text-sm font-medium">
-                    Marca
-                  </Label>
-                  <Input
-                    id="marca"
-                    {...register('marca')}
-                    placeholder="Ex: Apple, Samsung, Nike"
-                    className="h-11"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="sku" className="text-sm font-medium">
-                    SKU (Código do Produto)
-                  </Label>
-                  <Input
-                    id="sku"
-                    {...register('sku')}
-                    placeholder="Ex: IPH15PM-256-BLK"
-                    className="h-11"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="preco" className="text-sm font-medium">
-                      Preço *
-                    </Label>
-                    <Input
-                      id="preco"
-                      value={precoDisplay}
-                      onChange={handlePrecoChange}
-                      placeholder="R$ 0,00"
-                      className="h-11"
-                    />
-                    {errors.preco && (
-                      <p className="text-sm text-red-500 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {errors.preco.message}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="desconto" className="text-sm font-medium">
-                      Desconto (%)
-                    </Label>
-                    <Input
-                      id="desconto"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      {...register('desconto', { valueAsNumber: true })}
-                      placeholder="0"
-                      className="h-11"
-                    />
-                    {errors.desconto && (
-                      <p className="text-sm text-red-500 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {errors.desconto.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="estoque" className="text-sm font-medium">
-                      Estoque *
-                    </Label>
-                    <Input
-                      id="estoque"
-                      type="number"
-                      min="0"
-                      {...register('estoque', { valueAsNumber: true })}
-                      placeholder="0"
-                      className="h-11"
-                    />
-                    {errors.estoque && (
-                      <p className="text-sm text-red-500 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {errors.estoque.message}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="peso" className="text-sm font-medium">
-                      Peso (kg)
-                    </Label>
-                    <Input
-                      id="peso"
-                      type="number"
-                      min="0"
-                      step="0.001"
-                      {...register('peso', { valueAsNumber: true })}
-                      placeholder="0.000"
-                      className="h-11"
-                    />
-                    {errors.peso && (
-                      <p className="text-sm text-red-500 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {errors.peso.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="dimensoes" className="text-sm font-medium">
-                    Dimensões (C x L x A)
-                  </Label>
-                  <Input
-                    id="dimensoes"
-                    {...register('dimensoes')}
-                    placeholder="Ex: 15 x 7 x 0.8 cm"
-                    className="h-11"
-                  />
-                </div>
-              </div>
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-lg border p-4 sm:col-span-2">
+            <div>
+              <Label htmlFor="ativo">Produto ativo</Label>
+              <p className="text-sm text-muted-foreground">{ativo ? 'Visível para os clientes na loja.' : 'Escondido da loja.'}</p>
             </div>
-
-            {/* Descrição */}
-            <div className="space-y-2">
-              <Label htmlFor="descricao" className="text-sm font-medium">
-                Descrição do Produto *
-              </Label>
-              <Textarea
-                id="descricao"
-                {...register('descricao')}
-                placeholder="Descreva detalhadamente o produto, suas características, benefícios e especificações técnicas..."
-                rows={6}
-                className="resize-none"
-              />
-              <div className="flex justify-between items-center">
-                {errors.descricao && (
-                  <p className="text-sm text-red-500 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    {errors.descricao.message}
-                  </p>
-                )}
-                <p className="text-xs text-gray-500 ml-auto">
-                  {watch('descricao')?.length || 0}/1000 caracteres
-                </p>
-              </div>
-            </div>
-
-            {/* Status */}
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="ativo"
-                {...register('ativo')}
-                className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2"
-              />
-              <Label htmlFor="ativo" className="text-sm font-medium">
-                Produto ativo (visível na loja)
-              </Label>
-            </div>
-
-            {/* Botões de Ação */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1 h-11"
-                onClick={() => window.history.back()}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={loading}
-                className="flex-1 h-11 bg-primary hover:bg-primary-hover"
-              >
-                {loading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Salvando...
-                  </>
-                ) : (
-                  product ? 'Atualizar Produto' : 'Criar Produto'
-                )}
-              </Button>
-            </div>
-          </form>
+            <Switch id="ativo" checked={ativo} onCheckedChange={(c) => setValue('ativo', c, { shouldDirty: true })} />
+          </div>
         </CardContent>
       </Card>
-    </div>
+
+      <Card id="preco-estoque">
+        <CardHeader><CardTitle className="text-lg">Preço e estoque</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="preco">Preço *</Label>
+            <Input id="preco" inputMode="numeric" value={precoDisplay} onChange={handlePreco} placeholder="R$ 0,00" {...a11y('preco')} />
+            <FieldError id="preco-erro" message={err('preco')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="desconto">Desconto (%)</Label>
+            <Input id="desconto" type="number" inputMode="decimal" min="0" max="100" step="0.01" {...register('desconto')} {...a11y('desconto')} placeholder="0" />
+            <FieldError id="desconto-erro" message={err('desconto')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="estoque">Quantidade em estoque *</Label>
+            <Input id="estoque" type="number" inputMode="numeric" min="0" step="1" {...register('estoque')} {...a11y('estoque')} placeholder="0" />
+            <FieldError id="estoque-erro" message={err('estoque')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="sku">SKU (código interno)</Label>
+            <Input id="sku" {...register('sku')} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card id="imagem">
+        <CardHeader><CardTitle className="text-lg">Imagem</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <input
+            ref={fileInput}
+            id="imagem-arquivo"
+            type="file"
+            accept={ACCEPTED_IMAGE_TYPES.join(',')}
+            className="sr-only"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImage(f); e.target.value = ''; }}
+            aria-describedby="imagem-ajuda"
+          />
+          {imagem ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <img src={imagem} alt="Pré-visualização do produto" className="h-48 w-48 rounded-lg border object-cover" />
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={() => fileInput.current?.click()}>
+                  <Upload className="mr-2 h-4 w-4" aria-hidden="true" /> Trocar imagem
+                </Button>
+                <Button type="button" variant="outline" className="text-destructive hover:text-destructive" onClick={() => setValue('imagem', '', { shouldDirty: true })}>
+                  <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" /> Remover imagem
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div
+              className={cn('rounded-lg border-2 border-dashed p-8 text-center transition-colors', dragActive ? 'border-primary bg-primary-muted' : 'border-border', imageError && 'border-destructive')}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={(e) => { handleDrag(e); setDragActive(false); const f = e.dataTransfer.files?.[0]; if (f) handleImage(f); }}
+            >
+              <ImageIcon className="mx-auto mb-3 h-10 w-10 text-muted-foreground" aria-hidden="true" />
+              <p className="text-sm text-muted-foreground">Arraste uma imagem para cá ou</p>
+              <Button type="button" variant="outline" className="mt-3" onClick={() => fileInput.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" aria-hidden="true" /> Escolher arquivo
+              </Button>
+            </div>
+          )}
+          {imageError && <p role="alert" className="text-sm text-destructive">{imageError}</p>}
+          <p id="imagem-ajuda" className="text-xs text-muted-foreground">JPG, PNG ou WebP, até 5 MB. Imagens quadradas ficam melhores na vitrine.</p>
+        </CardContent>
+      </Card>
+
+      <Card id="envio">
+        <CardHeader><CardTitle className="text-lg">Envio</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="peso">Peso (kg)</Label>
+            <Input id="peso" type="number" inputMode="decimal" min="0" step="0.001" {...register('peso')} {...a11y('peso')} placeholder="0,000" />
+            <FieldError id="peso-erro" message={err('peso')} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="dimensoes">Dimensões (C × L × A)</Label>
+            <Input id="dimensoes" {...register('dimensoes')} placeholder="Ex.: 30 × 20 × 5 cm" />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="sticky bottom-16 z-10 -mx-4 flex gap-3 border-t bg-card/95 p-4 backdrop-blur sm:mx-0 sm:rounded-lg sm:border lg:bottom-0">
+        <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={cancel}>Cancelar</Button>
+        <Button type="submit" className="flex-1 sm:ml-auto sm:flex-none" disabled={loading}>
+          {loading ? 'Salvando…' : product ? 'Salvar alterações' : 'Cadastrar produto'}
+        </Button>
+      </div>
+    </form>
   );
 }

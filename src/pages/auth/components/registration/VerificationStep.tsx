@@ -88,9 +88,9 @@ export function VerificationStep({ data, onComplete, onBack }: VerificationStepP
 
   const getFileIcon = (file: File) => {
     if (file.type === 'application/pdf') {
-      return <FileText className="w-8 h-8 text-red-500" />;
+      return <FileText className="w-8 h-8 text-destructive" />;
     }
-    return <FileText className="w-8 h-8 text-blue-500" />;
+    return <FileText className="w-8 h-8 text-info" />;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -116,10 +116,10 @@ export function VerificationStep({ data, onComplete, onBack }: VerificationStepP
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-foreground mb-2">
           Verificação
         </h2>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Documentos e termos para finalizar seu cadastro
         </p>
       </div>
@@ -127,10 +127,10 @@ export function VerificationStep({ data, onComplete, onBack }: VerificationStepP
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Document Upload */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-foreground/80 mb-2">
             Comprovante de Inscrição *
           </label>
-          <p className="text-sm text-gray-500 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             Envie o Comprovante de Inscrição da sua empresa (PDF, JPG ou PNG - máx. 5MB)
           </p>
           
@@ -138,10 +138,10 @@ export function VerificationStep({ data, onComplete, onBack }: VerificationStepP
             <div
               className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
                 dragActive 
-                  ? 'border-green-400 bg-green-50' 
+                  ? 'border-primary bg-success-muted' 
                   : errors.document
-                  ? 'border-red-300 bg-red-50'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-destructive/40 bg-destructive-muted'
+                  : 'border-input hover:border-foreground/40'
               }`}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
@@ -156,30 +156,30 @@ export function VerificationStep({ data, onComplete, onBack }: VerificationStepP
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
               
-              <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-lg font-medium text-gray-700 mb-2">
+              <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-lg font-medium text-foreground/80 mb-2">
                 Clique para enviar ou arraste o arquivo aqui
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-muted-foreground">
                 PDF, JPG ou PNG (máx. 5MB)
               </p>
             </div>
           ) : (
-            <div className="border border-green-200 bg-green-50 rounded-lg p-4">
+            <div className="border border-success/30 bg-success-muted rounded-lg p-4">
               <div className="flex items-center space-x-3">
                 {getFileIcon(formData.document)}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium text-foreground truncate">
                     {formData.document.name}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     {formatFileSize(formData.document.size)}
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={removeFile}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
+                  className="text-muted-foreground hover:text-destructive transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -188,7 +188,7 @@ export function VerificationStep({ data, onComplete, onBack }: VerificationStepP
           )}
           
           {errors.document && (
-            <div className="mt-1 flex items-center space-x-1 text-red-600">
+            <div className="mt-1 flex items-center space-x-1 text-destructive">
               <AlertCircle className="w-4 h-4" />
               <p className="text-sm">{errors.document}</p>
             </div>
@@ -196,11 +196,11 @@ export function VerificationStep({ data, onComplete, onBack }: VerificationStepP
         </div>
 
         {/* Terms Acceptance */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="bg-warning-muted border border-warning/30 rounded-lg p-4">
           <div className="flex items-start space-x-3">
-            <AlertTriangle className="w-6 h-6 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <AlertTriangle className="w-6 h-6 text-warning mt-0.5 flex-shrink-0" />
             <div className="flex-1">
-              <h3 className="text-sm font-medium text-yellow-800 mb-2">
+              <h3 className="text-sm font-medium text-warning mb-2">
                 Termo de Responsabilidade
               </h3>
               <div className="space-y-3">
@@ -209,20 +209,20 @@ export function VerificationStep({ data, onComplete, onBack }: VerificationStepP
                     type="checkbox"
                     checked={formData.acceptTerms}
                     onChange={(e) => setFormData(prev => ({ ...prev, acceptTerms: e.target.checked }))}
-                    className={`w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500 mt-0.5 ${
-                      errors.acceptTerms ? 'border-red-500' : ''
+                    className={`w-4 h-4 text-primary border-input rounded focus:ring-ring mt-0.5 ${
+                      errors.acceptTerms ? 'border-destructive' : ''
                     }`}
                   />
-                  <span className="text-sm text-yellow-800">
+                  <span className="text-sm text-warning">
                     Declaro que sou o representante legal da loja informada e que os dados fornecidos são verdadeiros
                   </span>
                 </label>
                 
-                <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                <div className="bg-destructive-muted border border-destructive/30 rounded-md p-3">
                   <div className="flex items-center space-x-2">
-                    <AlertTriangle className="w-5 h-5 text-red-600" />
-                    <p className="text-sm font-medium text-red-800">
-                      ⚠️ O uso de marcas ou dados falsos resultará em bloqueio imediato e medidas legais.
+                    <AlertTriangle className="w-5 h-5 text-destructive" />
+                    <p className="text-sm font-medium text-destructive">
+                      O uso de marcas ou dados falsos resultará em bloqueio imediato e medidas legais.
                     </p>
                   </div>
                 </div>
@@ -231,7 +231,7 @@ export function VerificationStep({ data, onComplete, onBack }: VerificationStepP
           </div>
           
           {errors.acceptTerms && (
-            <div className="mt-2 flex items-center space-x-1 text-red-600">
+            <div className="mt-2 flex items-center space-x-1 text-destructive">
               <AlertCircle className="w-4 h-4" />
               <p className="text-sm">{errors.acceptTerms}</p>
             </div>
@@ -243,14 +243,14 @@ export function VerificationStep({ data, onComplete, onBack }: VerificationStepP
           <button
             type="button"
             onClick={onBack}
-            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition-all duration-200"
+            className="flex-1 bg-muted hover:bg-accent text-foreground/80 font-medium py-3 px-4 rounded-lg transition-all duration-200"
           >
             Voltar
           </button>
           <button
             type="submit"
             disabled={!formData.document || !formData.acceptTerms}
-            className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] focus:ring-4 focus:ring-green-500/30"
+            className="flex-1 bg-primary hover:bg-primary-hover disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed text-primary-foreground font-medium py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] focus:ring-4 focus:ring-ring/30"
           >
             Concluir Cadastro
           </button>

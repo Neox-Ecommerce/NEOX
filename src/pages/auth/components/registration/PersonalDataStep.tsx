@@ -82,9 +82,9 @@ export function PersonalDataStep({ data, onComplete }: PersonalDataStepProps) {
   };
 
   const getPasswordStrengthColor = () => {
-    if (passwordStrength <= 2) return 'bg-red-500';
-    if (passwordStrength <= 3) return 'bg-yellow-500';
-    return 'bg-green-500';
+    if (passwordStrength <= 2) return 'bg-destructive';
+    if (passwordStrength <= 3) return 'bg-warning';
+    return 'bg-primary';
   };
 
   const getPasswordStrengthText = () => {
@@ -96,10 +96,10 @@ export function PersonalDataStep({ data, onComplete }: PersonalDataStepProps) {
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-foreground mb-2">
           Dados Pessoais
         </h2>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Vamos começar com suas informações básicas
         </p>
       </div>
@@ -107,31 +107,31 @@ export function PersonalDataStep({ data, onComplete }: PersonalDataStepProps) {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Full Name Field */}
         <div>
-          <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="fullName" className="block text-sm font-medium text-foreground/80 mb-2">
             Nome Completo *
           </label>
           <div className="relative">
-            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <input
               id="fullName"
               type="text"
               value={formData.fullName}
               onChange={(e) => handleInputChange('fullName', e.target.value)}
-              className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${
+              className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 ${
                 errors.fullName 
-                  ? 'border-red-500 bg-red-50' 
+                  ? 'border-destructive bg-destructive-muted' 
                   : formData.fullName.trim().length >= 2
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-primary bg-success-muted'
+                  : 'border-input hover:border-foreground/40'
               }`}
               placeholder="Seu nome completo"
             />
             {formData.fullName.trim().length >= 2 && !errors.fullName && (
-              <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
+              <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-primary w-5 h-5" />
             )}
           </div>
           {errors.fullName && (
-            <div className="mt-1 flex items-center space-x-1 text-red-600">
+            <div className="mt-1 flex items-center space-x-1 text-destructive">
               <AlertCircle className="w-4 h-4" />
               <p className="text-sm">{errors.fullName}</p>
             </div>
@@ -140,31 +140,31 @@ export function PersonalDataStep({ data, onComplete }: PersonalDataStepProps) {
 
         {/* Email Field */}
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="email" className="block text-sm font-medium text-foreground/80 mb-2">
             E-mail *
           </label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <input
               id="email"
               type="email"
               value={formData.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
-              className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${
+              className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 ${
                 errors.email 
-                  ? 'border-red-500 bg-red-50' 
+                  ? 'border-destructive bg-destructive-muted' 
                   : /\S+@\S+\.\S+/.test(formData.email)
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-primary bg-success-muted'
+                  : 'border-input hover:border-foreground/40'
               }`}
               placeholder="seu@email.com"
             />
             {/\S+@\S+\.\S+/.test(formData.email) && !errors.email && (
-              <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
+              <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-primary w-5 h-5" />
             )}
           </div>
           {errors.email && (
-            <div className="mt-1 flex items-center space-x-1 text-red-600">
+            <div className="mt-1 flex items-center space-x-1 text-destructive">
               <AlertCircle className="w-4 h-4" />
               <p className="text-sm">{errors.email}</p>
             </div>
@@ -173,29 +173,29 @@ export function PersonalDataStep({ data, onComplete }: PersonalDataStepProps) {
 
         {/* Password Field */}
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="password" className="block text-sm font-medium text-foreground/80 mb-2">
             Senha *
           </label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <input
               id="password"
               type={showPassword ? 'text' : 'password'}
               value={formData.password}
               onChange={(e) => handleInputChange('password', e.target.value)}
-              className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${
+              className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 ${
                 errors.password 
-                  ? 'border-red-500 bg-red-50' 
+                  ? 'border-destructive bg-destructive-muted' 
                   : passwordStrength >= 4
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-primary bg-success-muted'
+                  : 'border-input hover:border-foreground/40'
               }`}
               placeholder="••••••••"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             >
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
@@ -205,27 +205,27 @@ export function PersonalDataStep({ data, onComplete }: PersonalDataStepProps) {
           {formData.password && (
             <div className="mt-2">
               <div className="flex items-center space-x-2">
-                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                <div className="flex-1 bg-muted rounded-full h-2">
                   <div
                     className={`h-2 rounded-full transition-all duration-300 ${getPasswordStrengthColor()}`}
                     style={{ width: `${(passwordStrength / 5) * 100}%` }}
                   />
                 </div>
                 <span className={`text-xs font-medium ${
-                  passwordStrength <= 2 ? 'text-red-600' : 
-                  passwordStrength <= 3 ? 'text-yellow-600' : 'text-green-600'
+                  passwordStrength <= 2 ? 'text-destructive' : 
+                  passwordStrength <= 3 ? 'text-warning' : 'text-primary'
                 }`}>
                   {getPasswordStrengthText()}
                 </span>
               </div>
-              <div className="mt-1 text-xs text-gray-500">
+              <div className="mt-1 text-xs text-muted-foreground">
                 Deve conter: maiúscula, minúscula, número e símbolo (min. 8 caracteres)
               </div>
             </div>
           )}
           
           {errors.password && (
-            <div className="mt-1 flex items-center space-x-1 text-red-600">
+            <div className="mt-1 flex items-center space-x-1 text-destructive">
               <AlertCircle className="w-4 h-4" />
               <p className="text-sm">{errors.password}</p>
             </div>
@@ -234,38 +234,38 @@ export function PersonalDataStep({ data, onComplete }: PersonalDataStepProps) {
 
         {/* Confirm Password Field */}
         <div>
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground/80 mb-2">
             Confirmar Senha *
           </label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <input
               id="confirmPassword"
               type={showConfirmPassword ? 'text' : 'password'}
               value={formData.confirmPassword}
               onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-              className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${
+              className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent transition-all duration-200 ${
                 errors.confirmPassword 
-                  ? 'border-red-500 bg-red-50' 
+                  ? 'border-destructive bg-destructive-muted' 
                   : formData.confirmPassword && formData.password === formData.confirmPassword
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-primary bg-success-muted'
+                  : 'border-input hover:border-foreground/40'
               }`}
               placeholder="••••••••"
             />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             >
               {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
             {formData.confirmPassword && formData.password === formData.confirmPassword && !errors.confirmPassword && (
-              <CheckCircle className="absolute right-10 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
+              <CheckCircle className="absolute right-10 top-1/2 transform -translate-y-1/2 text-primary w-5 h-5" />
             )}
           </div>
           {errors.confirmPassword && (
-            <div className="mt-1 flex items-center space-x-1 text-red-600">
+            <div className="mt-1 flex items-center space-x-1 text-destructive">
               <AlertCircle className="w-4 h-4" />
               <p className="text-sm">{errors.confirmPassword}</p>
             </div>
@@ -275,7 +275,7 @@ export function PersonalDataStep({ data, onComplete }: PersonalDataStepProps) {
         {/* Submit Button */}
         <button
           type="submit"
-          className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] focus:ring-4 focus:ring-green-500/30"
+          className="w-full bg-primary hover:bg-primary-hover text-primary-foreground font-medium py-3 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] focus:ring-4 focus:ring-ring/30"
         >
           Continuar
         </button>
