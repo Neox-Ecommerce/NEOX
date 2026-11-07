@@ -1,6 +1,6 @@
 <div align="center">
   <img src="public/logo.png" alt="Logo da NEOX" width="120">
-  <h1>NEOX — Front-end</h1>
+  <h1>NEOX - Front-end</h1>
 </div>
 
 SPA do NEOX (marketplace multi-loja): React 18, TypeScript, Vite, Tailwind/shadcn, TanStack Query.
